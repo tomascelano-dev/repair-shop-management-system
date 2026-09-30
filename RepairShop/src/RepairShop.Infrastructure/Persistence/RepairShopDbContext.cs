@@ -44,6 +44,7 @@ public sealed partial class RepairShopDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigurePremium(modelBuilder);
+        ConfigureSaas(modelBuilder);
         modelBuilder.Entity<WorkshopWorkflow>(b => {
             b.ToTable("workflows"); b.HasKey(x => x.Id);
             b.Property(x => x.Number).UseIdentityByDefaultColumn();

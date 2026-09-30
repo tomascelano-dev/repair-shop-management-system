@@ -61,6 +61,7 @@ jobs:
       Jwt__Issuer: RepairShop
       Jwt__Audience: RepairShop
       LocalDemo__Enabled: "true"
+      Security__Login__RateLimit__PermitLimit: "500"
       Saas__Billing__Provider: Simulated
       Saas__Fiscal__Provider: Simulated
       Saas__Messaging__Provider: Log

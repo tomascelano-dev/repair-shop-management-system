@@ -35,6 +35,9 @@ public sealed class ProblemDetailsMiddleware : IMiddleware
             var (statusCode, title) = ex switch
             {
                 RepairShop.Api.V2.WorkflowConflict => (409, "Actualización en conflicto"),
+                RepairShop.Api.Saas.PlanRequiredException => (403, "Plan insuficiente"),
+                RepairShop.Api.Saas.SubscriptionInactiveException => (402, "Suscripción inactiva"),
+                RepairShop.Api.Saas.ForbiddenException => (403, "Forbidden"),
                 UnauthorizedAccessException => (401, "Unauthorized"),
                 DomainException => ((int)HttpStatusCode.BadRequest, "Domain validation error"),
                 NotFoundException => ((int)HttpStatusCode.NotFound, "Resource not found"),

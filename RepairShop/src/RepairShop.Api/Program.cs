@@ -12,6 +12,9 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using RepairShop.Api.Common;
 using RepairShop.Api.Security;
+using RepairShop.Api.Saas;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using RepairShop.Application.RepairOrders;
 using RepairShop.Application.Security;
 using RepairShop.Infrastructure;
@@ -124,7 +127,8 @@ builder.Services
             IssuerSigningKey = signingKey,
             ClockSkew = TimeSpan.FromMinutes(1)
         };
-    });
+    })
+    .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyAuthenticationHandler.Scheme, null);
 
 builder.Services.AddAuthorization(options =>
 {
@@ -266,6 +270,36 @@ builder.Services.AddScoped<ChangeOrderStatusService>();
 
 // Api services
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
+
+// SaaS platform: plans, billing, fiscal vouchers, messaging, integrations.
+builder.Services.Configure<SaasOptions>(builder.Configuration.GetSection(SaasOptions.Section));
+builder.Services.Configure<BillingOptions>(builder.Configuration.GetSection(BillingOptions.Section));
+builder.Services.Configure<MessagingOptions>(builder.Configuration.GetSection(MessagingOptions.Section));
+builder.Services.Configure<FiscalOptions>(builder.Configuration.GetSection(FiscalOptions.Section));
+var keysPath = builder.Configuration.GetValue<string>("Saas:DataProtectionKeysPath");
+builder.Services.AddDataProtection().SetApplicationName("RepairShop")
+    .PersistKeysToFileSystem(new DirectoryInfo(string.IsNullOrWhiteSpace(keysPath) ? Path.Combine(builder.Environment.ContentRootPath, "data", "keys") : keysPath));
+builder.Services.AddScoped<SubscriptionService>();
+builder.Services.AddScoped<Notifier>();
+builder.Services.AddScoped<SaasEvents>();
+builder.Services.AddScoped<SimulatedFiscalProvider>();
+builder.Services.AddHttpClient<ArcaFiscalProvider>(c => c.Timeout = TimeSpan.FromSeconds(40));
+if (builder.Configuration.GetValue<string>("Saas:Billing:Provider") == "MercadoPago")
+    builder.Services.AddHttpClient<IBillingProvider, MercadoPagoBillingProvider>(c => c.Timeout = TimeSpan.FromSeconds(20));
+else
+    builder.Services.AddSingleton<IBillingProvider, SimulatedBillingProvider>();
+if (builder.Configuration.GetValue<string>("Saas:Messaging:Provider") == "Live")
+    builder.Services.AddHttpClient<IMessageSender, LiveMessageSender>(c => c.Timeout = TimeSpan.FromSeconds(20));
+else
+    builder.Services.AddSingleton<IMessageSender, LogMessageSender>();
+builder.Services.AddHttpClient("webhooks", c => c.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddHttpClient("woocommerce", c => c.Timeout = TimeSpan.FromSeconds(30));
+if (!isSeedCommand && (builder.Configuration.GetValue<bool?>("Saas:BackgroundJobs") ?? true))
+{
+    builder.Services.AddHostedService<OutboxDispatcher>();
+    builder.Services.AddHostedService<SaasScheduler>();
+    builder.Services.AddHostedService<WebhookDispatcher>();
+}
 builder.Services.AddTransient<ProblemDetailsMiddleware>();
 builder.Services.AddTransient<CorrelationIdMiddleware>();
 
@@ -345,6 +379,7 @@ app.UseCors(Policies.CorsDefault);
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<SubscriptionGateMiddleware>();
 
 // Workflow orders are mutated through the transactional v2 commands.
 app.Use(async (context, next) => {
