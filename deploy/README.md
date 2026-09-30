@@ -31,6 +31,25 @@ docker compose up -d --build
 
 Cuando termina, `https://TU_DOMINIO` muestra el login. El alta de talleres está en `https://TU_DOMINIO/signup`.
 
+### Servidor que ya tiene un proxy en 80/443
+
+Si el servidor ya corre Caddy o Nginx en el host (por ejemplo con el certificado de origen de Cloudflare), no publiques los puertos 80 y 443 desde este stack. Usá el override, que deja la app en `127.0.0.1:${WEB_PORT}` (8085 por defecto) sin HTTPS propio:
+
+```bash
+docker compose -f compose.yml -f compose.behind-proxy.yml up -d --build
+```
+
+En el proxy del host, agregá el sitio con el mismo `tls` que usan los demás:
+
+```
+beta.tudominio.com.ar {
+	tls /ruta/al/cert.pem /ruta/a/la/key.pem
+	reverse_proxy 127.0.0.1:8085
+}
+```
+
+Requiere Docker Compose 2.24 o superior.
+
 ## 3. Mercado Pago (cobro de la suscripción)
 
 1. En [Tus integraciones](https://www.mercadopago.com.ar/developers/panel/app) creá una aplicación y copiá el **Access Token de producción** en `MP_ACCESS_TOKEN`.
