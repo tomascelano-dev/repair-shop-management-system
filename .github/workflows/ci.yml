@@ -1,0 +1,88 @@
+name: ci
+
+on:
+  push:
+    branches: ["main", "v2"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Restore
+        run: dotnet restore RepairShop/RepairShop.sln
+      - name: Build
+        run: dotnet build RepairShop/RepairShop.sln -c Release --no-restore
+      - name: Unit tests
+        run: dotnet test RepairShop/RepairShop.sln -c Release --no-build
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Typecheck and build
+        run: npm run build
+
+  smoke:
+    needs: [backend]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: repairshop_v2
+          POSTGRES_USER: repairshop
+          POSTGRES_PASSWORD: repairshop_ci
+        ports: ["5482:5432"]
+        options: >-
+          --health-cmd "pg_isready -U repairshop -d repairshop_v2"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__RepairShopDb: Host=127.0.0.1;Port=5482;Database=repairshop_v2;Username=repairshop;Password=repairshop_ci
+      Jwt__Key: ci_only_signing_key_ci_only_signing_key_0123456789
+      Jwt__Issuer: RepairShop
+      Jwt__Audience: RepairShop
+      LocalDemo__Enabled: "true"
+      Saas__Billing__Provider: Simulated
+      Saas__Fiscal__Provider: Simulated
+      Saas__Messaging__Provider: Log
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build API
+        run: dotnet build RepairShop/src/RepairShop.Api/RepairShop.Api.csproj -c Release
+      - name: Start API
+        working-directory: RepairShop/src/RepairShop.Api
+        run: |
+          nohup dotnet bin/Release/net8.0/RepairShop.Api.dll --urls http://127.0.0.1:5282 > "$RUNNER_TEMP/api.log" 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:5282/readyz && exit 0; sleep 2; done
+          cat "$RUNNER_TEMP/api.log"; exit 1
+      - name: Smoke tests
+        run: |
+          for t in tests/*-smoke.mjs; do echo "== $t"; node "$t"; done
+      - name: API log
+        if: failure()
+        run: cat "$RUNNER_TEMP/api.log"
