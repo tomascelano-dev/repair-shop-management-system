@@ -29,6 +29,7 @@ export default function Intake({
     deviceId: "",
     customerName: "",
     phone: "",
+    email: "",
     brand: "Apple",
     model: "",
     identifier: "",
@@ -148,6 +149,18 @@ export default function Intake({
                   />
                 </Field>
               </div>
+              <Field
+                label="Email (opcional)"
+                hint="Para enviarle el presupuesto, los avisos de estado y el link de seguimiento."
+              >
+                <input
+                  type="email"
+                  maxLength={160}
+                  value={form.email}
+                  onChange={(e) => set("email", e.target.value)}
+                  placeholder="cliente@email.com"
+                />
+              </Field>
               <div className="info-box">
                 El comprobante conservará los datos del cliente y del equipo al
                 momento de recibirlo.

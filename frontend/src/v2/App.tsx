@@ -29,6 +29,14 @@ import {
   SlidersHorizontal,
   RefreshCw,
   ShieldCheck,
+  Wallet,
+  ReceiptText,
+  CalendarDays,
+  ClipboardList,
+  HardHat,
+  BarChart3,
+  Settings as SettingsIcon,
+  Lock,
 } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import {
@@ -48,7 +56,86 @@ import OrderDetail from "./OrderDetail";
 import Portal from "./Portal";
 import Catalog from "./Catalog";
 import Premium, { modules } from "./premium/Premium";
+import {
+  SessionContext,
+  type Me,
+  planNames,
+  subscriptionNames,
+  daysLeft,
+} from "./saas/session";
+import { Tracking, Booking, Survey, Signup } from "./saas/Public";
+import Settings, { SimulatedCheckout } from "./saas/Settings";
+import Cash from "./saas/Cash";
+import Invoices, { InvoicePrint } from "./saas/Invoices";
+import Agenda from "./saas/Agenda";
+import Services from "./saas/Services";
+import Tech from "./saas/Tech";
+import Reports, { AlertsBell } from "./saas/Reports";
+import { OrderTicket, SaleTicket } from "./saas/Print";
+import { OnboardingCard, SubscriptionBanner } from "./saas/Widgets";
 import "./v2.css";
+import "./saas/saas.css";
+
+const operations = [
+  {
+    to: "/agenda",
+    name: "Agenda y turnos",
+    icon: CalendarDays,
+    module: "agenda",
+  },
+  { to: "/cash", name: "Caja y mostrador", icon: Wallet, module: "cash" },
+  {
+    to: "/invoices",
+    name: "Facturación",
+    icon: ReceiptText,
+    module: "invoicing",
+  },
+  {
+    to: "/services",
+    name: "Servicios y precios",
+    icon: ClipboardList,
+    module: "catalog",
+  },
+  { to: "/tech", name: "App del técnico", icon: HardHat, module: "technician" },
+  { to: "/reports", name: "Reportes", icon: BarChart3, module: "" },
+];
+const adminOnly = ["/cash", "/invoices"];
+const titles: [string, string][] = [
+  ["/orders/", "Detalle de orden"],
+  ["/orders", "Órdenes de trabajo"],
+  ["/customers", "Clientes"],
+  ["/agenda", "Agenda y turnos"],
+  ["/cash", "Caja y mostrador"],
+  ["/invoices", "Facturación"],
+  ["/services", "Servicios y precios"],
+  ["/tech", "App del técnico"],
+  ["/reports", "Reportes"],
+  ["/settings", "Configuración"],
+  ["/billing", "Suscripción"],
+];
+
+// Pages customers open without an account: tracking, online booking, surveys and the approval portal.
+function PublicApp() {
+  return (
+    <>
+      <Routes>
+        <Route path="/portal" element={<Portal />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/seguimiento/:slug" element={<Tracking />} />
+        <Route path="/turnos/:slug" element={<Booking />} />
+        <Route path="/encuesta/:token" element={<Survey />} />
+      </Routes>
+      <Toaster richColors />
+    </>
+  );
+}
+const publicPaths = [
+  "/portal",
+  "/signup",
+  "/seguimiento/",
+  "/turnos/",
+  "/encuesta/",
+];
 
 export default function App() {
   const location = useLocation();
@@ -64,6 +151,14 @@ export default function App() {
   });
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
+  const [me, setMe] = useState<Me | null>(null);
+  const loadMe = useCallback(async () => {
+    try {
+      setMe(await request<Me>("/api/saas/me"));
+    } catch {
+      /* the session keeps working with the defaults; the 401 handler covers expired tokens */
+    }
+  }, []);
   const load = useCallback(async () => {
     try {
       setData(await request("/api/v2/orders"));
@@ -77,17 +172,22 @@ export default function App() {
   useEffect(() => {
     if (token) {
       load();
-      const timer = setInterval(load, 20000);
+      loadMe();
+      const timer = setInterval(() => {
+        load();
+        loadMe();
+      }, 20000);
       return () => clearInterval(timer);
     }
-  }, [token, load]);
-  if (location.pathname === "/portal")
-    return (
-      <>
-        <Portal />
-        <Toaster richColors />
-      </>
-    );
+  }, [token, load, loadMe]);
+  if (
+    publicPaths.some(
+      (p) =>
+        location.pathname === p ||
+        (p.endsWith("/") && location.pathname.startsWith(p)),
+    )
+  )
+    return <PublicApp />;
   if (!token)
     return (
       <>
@@ -101,203 +201,293 @@ export default function App() {
       </>
     );
   const user = JSON.parse(localStorage.getItem(USER_KEY) || "{}");
+  const admin = (me?.user.role || user.role) === "Admin";
+  const has = (m: string) => !me || !m || me.subscription.modules.includes(m);
+  const session = { me, reload: loadMe, has, admin };
   const open = data.orders.filter(
     (o) => !["Delivered", "Cancelled"].includes(o.status),
   ).length;
+  if (
+    location.pathname.startsWith("/print/") ||
+    location.pathname.startsWith("/billing/")
+  )
+    return (
+      <SessionContext.Provider value={session}>
+        <Routes>
+          <Route path="/print/invoice/:id" element={<InvoicePrint />} />
+          <Route path="/print/order/:id" element={<OrderTicket />} />
+          <Route path="/print/sale/:id" element={<SaleTicket />} />
+          <Route path="/billing/simulated" element={<SimulatedCheckout />} />
+        </Routes>
+        <Toaster richColors />
+      </SessionContext.Provider>
+    );
+  const shopName = me?.profile.displayName || "Mi taller";
+  const sub = me?.subscription;
   return (
-    <div className="workshop-app">
-      <aside className={`sidebar ${mobile ? "is-open" : ""}`}>
-        <Link to="/" aria-label="Inicio">
-          <Brand />
-        </Link>
-        <button
-          className="mobile-close icon-button"
-          onClick={() => setMobile(false)}
-          aria-label="Cerrar menú"
-        >
-          <X />
-        </button>
-        <div className="workspace-switch">
-          <span className="workspace-avatar">T</span>
-          <div>
-            <strong>Mi taller</strong>
-            <small>Espacio de trabajo</small>
-          </div>
-          <ChevronRight size={14} />
-        </div>
-        <small className="nav-caption">OPERACIÓN</small>
-        <nav onClick={() => setMobile(false)}>
-          <NavLink to="/" end>
-            <LayoutDashboard size={19} />
-            Vista general
-          </NavLink>
-          <NavLink to="/orders">
-            <Wrench size={19} />
-            Órdenes de trabajo<span className="nav-count">{open}</span>
-          </NavLink>
-          <NavLink to="/customers">
-            <Users size={19} />
-            Clientes
-          </NavLink>
-          <NavLink to="/premium" end>
-            <Boxes size={19} />
-            Módulos premium
-          </NavLink>
-          <small className="nav-caption premium-nav-caption">
-            GESTIÓN DEL NEGOCIO
-          </small>
-          {modules.map((m) => (
-            <NavLink key={m.id} to={`/premium/${m.id}`}>
-              <m.icon size={18} />
-              {m.name}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="local-card">
-            <span className="live-dot" />
-            <strong>Versión local · v2</strong>
-            <p>
-              Los registros marcados como demo son ficticios. Tus cambios se
-              guardan.
-            </p>
-          </div>
-          <div className="user-card">
-            <span className="avatar">
-              {(user.displayName || "A").slice(0, 1)}
-            </span>
+    <SessionContext.Provider value={session}>
+      <div className="workshop-app">
+        <aside className={`sidebar ${mobile ? "is-open" : ""}`}>
+          <Link to="/" aria-label="Inicio">
+            <Brand />
+          </Link>
+          <button
+            className="mobile-close icon-button"
+            onClick={() => setMobile(false)}
+            aria-label="Cerrar menú"
+          >
+            <X />
+          </button>
+          <Link
+            to="/settings/taller"
+            className="workspace-switch"
+            onClick={() => setMobile(false)}
+          >
+            {me?.profile.logoDataUrl ? (
+              <img
+                className="workspace-avatar"
+                src={me.profile.logoDataUrl}
+                alt=""
+              />
+            ) : (
+              <span className="workspace-avatar">
+                {shopName.slice(0, 1).toUpperCase()}
+              </span>
+            )}
             <div>
-              <strong>{user.displayName || "Administrador"}</strong>
+              <strong>{shopName}</strong>
               <small>
-                {user.role === "Admin" ? "Administrador" : "Técnico"}
+                {sub
+                  ? `Plan ${planNames[sub.plan] || sub.plan}`
+                  : "Espacio de trabajo"}
               </small>
             </div>
-            <button
-              className="icon-button"
-              title="Cerrar sesión"
-              onClick={() => {
-                localStorage.removeItem(TOKEN_KEY);
-                localStorage.removeItem(USER_KEY);
-                setToken(null);
-              }}
-            >
-              <LogOut size={17} />
-            </button>
-          </div>
-        </div>
-      </aside>
-      {mobile && (
-        <div className="sidebar-overlay" onClick={() => setMobile(false)} />
-      )}
-      <div className="workspace-main">
-        <header className="topbar">
-          <div className="breadcrumb">
-            <button
-              className="icon-button menu-toggle"
-              aria-label="Abrir menú"
-              onClick={() => setMobile(true)}
-            >
-              <Menu />
-            </button>
-            <span>Mi taller</span>
             <ChevronRight size={14} />
-            <strong>
-              {location.pathname.includes("/orders/")
-                ? "Detalle de orden"
-                : location.pathname.startsWith("/orders")
-                  ? "Órdenes de trabajo"
-                  : location.pathname === "/inventory"
-                    ? "Inventario"
-                    : location.pathname === "/customers"
-                      ? "Clientes"
-                      : location.pathname.startsWith("/premium")
-                        ? modules.find((m) => location.pathname.endsWith(m.id))
-                            ?.name || "Módulos premium"
-                        : "Vista general"}
-            </strong>
+          </Link>
+          <small className="nav-caption">OPERACIÓN</small>
+          <nav onClick={() => setMobile(false)}>
+            <NavLink to="/" end>
+              <LayoutDashboard size={19} />
+              Vista general
+            </NavLink>
+            <NavLink to="/orders">
+              <Wrench size={19} />
+              Órdenes de trabajo<span className="nav-count">{open}</span>
+            </NavLink>
+            <NavLink to="/customers">
+              <Users size={19} />
+              Clientes
+            </NavLink>
+            {operations
+              .filter((m) => admin || !adminOnly.includes(m.to))
+              .map((m) => (
+                <NavLink
+                  key={m.to}
+                  to={has(m.module) ? m.to : "/settings/plan"}
+                  className={({ isActive }) =>
+                    has(m.module) ? (isActive ? "active" : "") : "locked"
+                  }
+                >
+                  <m.icon size={18} />
+                  {m.name}
+                  {!has(m.module) && <Lock size={13} className="nav-lock" />}
+                </NavLink>
+              ))}
+            <small className="nav-caption premium-nav-caption">
+              GESTIÓN DEL NEGOCIO
+            </small>
+            <NavLink to="/premium" end>
+              <Boxes size={18} />
+              Resumen de módulos
+            </NavLink>
+            {modules.map((m) => (
+              <NavLink
+                key={m.id}
+                to={has(m.id) ? `/premium/${m.id}` : "/settings/plan"}
+                className={({ isActive }) =>
+                  has(m.id) ? (isActive ? "active" : "") : "locked"
+                }
+              >
+                <m.icon size={18} />
+                {m.name}
+                {!has(m.id) && <Lock size={13} className="nav-lock" />}
+              </NavLink>
+            ))}
+            <small className="nav-caption premium-nav-caption">CUENTA</small>
+            <NavLink to="/settings">
+              <SettingsIcon size={18} />
+              Configuración
+            </NavLink>
+          </nav>
+          <div className="sidebar-bottom">
+            {sub && (
+              <Link
+                to="/settings/plan"
+                className="local-card"
+                onClick={() => setMobile(false)}
+              >
+                <span className="live-dot" />
+                <strong>
+                  Plan {planNames[sub.plan] || sub.plan} ·{" "}
+                  {subscriptionNames[sub.status] || sub.status}
+                </strong>
+                <p>
+                  {sub.status === "Trialing"
+                    ? `Te quedan ${daysLeft(sub.trialEndsAtUtc)} días de prueba con todos los módulos.`
+                    : sub.readOnly
+                      ? "Cuenta en modo solo lectura."
+                      : "Ver plan, pagos y módulos incluidos."}
+                </p>
+              </Link>
+            )}
+            <div className="user-card">
+              <span className="avatar">
+                {(user.displayName || "A").slice(0, 1)}
+              </span>
+              <div>
+                <strong>{user.displayName || "Administrador"}</strong>
+                <small>
+                  {user.role === "Admin" ? "Administrador" : "Técnico"}
+                </small>
+              </div>
+              <button
+                className="icon-button"
+                title="Cerrar sesión"
+                onClick={() => {
+                  localStorage.removeItem(TOKEN_KEY);
+                  localStorage.removeItem(USER_KEY);
+                  setToken(null);
+                }}
+              >
+                <LogOut size={17} />
+              </button>
+            </div>
           </div>
-          <div className="topbar-right">
-            <span className="today">
-              {new Date().toLocaleDateString("es-AR", {
-                day: "numeric",
-                month: "long",
-              })}
-            </span>
-            <button
-              className="button primary small"
-              onClick={() => setIntake(true)}
-            >
-              <Plus size={17} />
-              Nueva recepción
-            </button>
-          </div>
-        </header>
-        <main className="page">
-          <ErrorBox message={error} />
-          <Routes>
-            <Route
-              path="/"
-              element={
-                busy ? (
-                  <Loading />
-                ) : (
+        </aside>
+        {mobile && (
+          <div className="sidebar-overlay" onClick={() => setMobile(false)} />
+        )}
+        <div className="workspace-main">
+          <header className="topbar">
+            <div className="breadcrumb">
+              <button
+                className="icon-button menu-toggle"
+                aria-label="Abrir menú"
+                onClick={() => setMobile(true)}
+              >
+                <Menu />
+              </button>
+              <span>{shopName}</span>
+              <ChevronRight size={14} />
+              <strong>
+                {titles.find(([p]) => location.pathname.startsWith(p))?.[1] ||
+                  (location.pathname.startsWith("/premium")
+                    ? modules.find((m) => location.pathname.endsWith(m.id))
+                        ?.name || "Módulos premium"
+                    : "Vista general")}
+              </strong>
+            </div>
+            <div className="topbar-right">
+              <span className="today">
+                {new Date().toLocaleDateString("es-AR", {
+                  day: "numeric",
+                  month: "long",
+                })}
+              </span>
+              <AlertsBell />
+              <button
+                className="button primary small"
+                onClick={() => setIntake(true)}
+              >
+                <Plus size={17} />
+                Nueva recepción
+              </button>
+            </div>
+          </header>
+          <SubscriptionBanner />
+          <main className="page">
+            <ErrorBox message={error} />
+            {location.pathname === "/" && <OnboardingCard />}
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  busy ? (
+                    <Loading />
+                  ) : (
+                    <Dashboard data={data} onNew={() => setIntake(true)} />
+                  )
+                }
+              />
+              <Route
+                path="/orders"
+                element={
+                  busy ? (
+                    <Loading />
+                  ) : (
+                    <Orders data={data} onNew={() => setIntake(true)} />
+                  )
+                }
+              />
+              <Route
+                path="/orders/:id"
+                element={<OrderDetail onChanged={load} />}
+              />
+              <Route path="/customers" element={<Catalog type="customers" />} />
+              <Route
+                path="/inventory"
+                element={<Navigate to="/premium/stock" replace />}
+              />
+              <Route path="/premium" element={<Premium />} />
+              <Route path="/premium/:module" element={<Premium />} />
+              <Route path="/agenda" element={<Agenda />} />
+              <Route path="/cash" element={<Cash />} />
+              <Route path="/invoices" element={<Invoices />} />
+              <Route path="/services" element={<Services />} />
+              <Route path="/tech" element={<Tech />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route
+                path="/settings"
+                element={<Navigate to="/settings/taller" replace />}
+              />
+              <Route path="/settings/:tab" element={<Settings />} />
+              <Route
+                path="*"
+                element={
                   <Dashboard data={data} onNew={() => setIntake(true)} />
-                )
-              }
-            />
-            <Route
-              path="/orders"
-              element={
-                busy ? (
-                  <Loading />
-                ) : (
-                  <Orders data={data} onNew={() => setIntake(true)} />
-                )
-              }
-            />
-            <Route
-              path="/orders/:id"
-              element={<OrderDetail onChanged={load} />}
-            />
-            <Route path="/customers" element={<Catalog type="customers" />} />
-            <Route
-              path="/inventory"
-              element={<Navigate to="/premium/stock" replace />}
-            />
-            <Route path="/premium" element={<Premium />} />
-            <Route path="/premium/:module" element={<Premium />} />
-            <Route
-              path="*"
-              element={<Dashboard data={data} onNew={() => setIntake(true)} />}
-            />
-          </Routes>
-          <footer className="page-footer">
-            <span>RepairShop v2</span>
-            <span>
-              <ShieldCheck size={13} />
-              Datos guardados en tu instalación local
-            </span>
-            <button
-              onClick={() => {
-                load();
-                toast.success("Datos actualizados");
-              }}
-            >
-              <RefreshCw size={12} />
-              Actualizar
-            </button>
-          </footer>
-        </main>
+                }
+              />
+            </Routes>
+            <footer className="page-footer">
+              <span>RepairShop v2</span>
+              <span>
+                <ShieldCheck size={13} />
+                Tus datos, con copias de seguridad diarias
+              </span>
+              <button
+                onClick={() => {
+                  load();
+                  toast.success("Datos actualizados");
+                }}
+              >
+                <RefreshCw size={12} />
+                Actualizar
+              </button>
+            </footer>
+          </main>
+        </div>
+        {intake && <Intake onClose={() => setIntake(false)} onCreated={load} />}
+        <Toaster richColors position="bottom-right" />
       </div>
-      {intake && <Intake onClose={() => setIntake(false)} onCreated={load} />}
-      <Toaster richColors position="bottom-right" />
-    </div>
+    </SessionContext.Provider>
   );
 }
 
+const localDemo = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+
 function Login({ onLogin }: { onLogin: () => void }) {
-  const [email, setEmail] = useState("admin@local");
-  const [password, setPassword] = useState("Admin12345");
+  const [email, setEmail] = useState(localDemo ? "admin@local" : "");
+  const [password, setPassword] = useState(localDemo ? "Admin12345" : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
@@ -376,16 +566,22 @@ function Login({ onLogin }: { onLogin: () => void }) {
               <ArrowRight size={17} />
             </button>
           </form>
-          <div className="login-demo">
-            <span className="live-dot" />
-            Demostración local
-            <p>
-              Admin: <b>admin@local</b> · <b>Admin12345</b>
-            </p>
-            <p>
-              Técnico: <b>tech@local</b> · <b>Tech123456</b>
-            </p>
-          </div>
+          <p className="login-switch">
+            ¿Todavía no tenés cuenta?{" "}
+            <Link to="/signup">Probalo gratis 14 días</Link>
+          </p>
+          {localDemo && (
+            <div className="login-demo">
+              <span className="live-dot" />
+              Demostración local
+              <p>
+                Admin: <b>admin@local</b> · <b>Admin12345</b>
+              </p>
+              <p>
+                Técnico: <b>tech@local</b> · <b>Tech123456</b>
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

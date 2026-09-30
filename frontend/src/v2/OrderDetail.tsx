@@ -30,6 +30,7 @@ import {
   USER_KEY,
 } from "./api";
 import { Status, Field, ErrorBox, Loading, Modal, Empty } from "./ui";
+import { OrderOnline, DamageDiagram } from "./saas/OrderExtras";
 
 const checkLabels: Record<string, string> = {
   ok: "Funciona",
@@ -179,12 +180,21 @@ export default function OrderDetail({ onChanged }: { onChanged: () => void }) {
         </div>
         <div className="heading-actions">
           <Status value={status} />
+          <a
+            className="button secondary small"
+            href={`/print/order/${id}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Printer size={16} />
+            Ticket
+          </a>
           <button
             className="button secondary small"
             onClick={() => window.print()}
           >
             <Printer size={16} />
-            Comprobante
+            Comprobante A4
           </button>
         </div>
       </div>
@@ -270,19 +280,41 @@ export default function OrderDetail({ onChanged }: { onChanged: () => void }) {
         </div>
       </div>
       <div className="tabs">
-        {["Resumen", "Diagnóstico", "Presupuesto", "Cobros", "Historial"].map(
-          (t) => (
-            <button
-              key={t}
-              className={tab === t ? "active" : ""}
-              onClick={() => setTab(t)}
-            >
-              {t}
-              {t === "Cobros" && <span>{d.payments.length}</span>}
-            </button>
-          ),
-        )}
+        {[
+          "Resumen",
+          "Diagnóstico",
+          "Daños",
+          "Presupuesto",
+          "Cobros",
+          "Cliente y factura",
+          "Historial",
+        ].map((t) => (
+          <button
+            key={t}
+            className={tab === t ? "active" : ""}
+            onClick={() => setTab(t)}
+          >
+            {t}
+            {t === "Cobros" && <span>{d.payments.length}</span>}
+          </button>
+        ))}
       </div>
+      {tab === "Daños" && <DamageDiagram orderId={id!} closed={closed} />}
+      {tab === "Cliente y factura" && (
+        <OrderOnline
+          orderId={id!}
+          version={w.version}
+          customerName={w.customerName}
+          due={due}
+          currency={currency}
+          accepted={q?.status === "Accepted"}
+          closed={closed}
+          onChanged={() => {
+            load();
+            onChanged();
+          }}
+        />
+      )}
       {tab === "Resumen" && (
         <div className="detail-grid">
           <div className="stack">
