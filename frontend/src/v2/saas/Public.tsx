@@ -608,7 +608,17 @@ export function Signup() {
                 checked={accept}
                 onChange={(e) => setAccept(e.target.checked)}
               />
-              Acepto los términos del servicio y la política de privacidad.
+              <span>
+                Acepto los{" "}
+                <a href="/terminos" target="_blank">
+                  términos del servicio
+                </a>{" "}
+                y la{" "}
+                <a href="/privacidad" target="_blank">
+                  política de privacidad
+                </a>
+                .
+              </span>
             </label>
             <button className="button primary full" disabled={busy || !accept}>
               {busy ? "Creando tu taller…" : "Crear mi taller"}

@@ -431,7 +431,7 @@ export default function OrderDetail({ onChanged }: { onChanged: () => void }) {
               </button>
               {link && (
                 <div className="portal-link-box">
-                  <p>Enlace creado para esta computadora.</p>
+                  <p>Enlace listo para compartir con el cliente.</p>
                   <a
                     className="button secondary full"
                     href={link}
@@ -475,7 +475,7 @@ export default function OrderDetail({ onChanged }: { onChanged: () => void }) {
               )}
               <small>
                 Al renovar, el enlace anterior deja de funcionar. Vigencia: 30
-                días. En esta versión local se abre desde esta PC.
+                días.
               </small>
             </section>
             <section className="panel padded">

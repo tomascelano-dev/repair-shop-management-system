@@ -175,12 +175,10 @@ export default function Premium() {
             <div className="premium-welcome">
               <span className="live-dot" />
               <div>
-                <strong>
-                  Los seis módulos están habilitados en esta instalación local
-                </strong>
+                <strong>Herramientas para hacer crecer el taller</strong>
                 <p>
-                  Los cambios se guardan en la base de datos. Los ejemplos
-                  identificados como demo son ficticios.
+                  Cada módulo trabaja con tus órdenes, clientes y stock en
+                  tiempo real.
                 </p>
               </div>
             </div>

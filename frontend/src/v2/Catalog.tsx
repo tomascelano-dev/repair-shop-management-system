@@ -218,8 +218,7 @@ export default function Catalog({ type }: { type: "customers" | "inventory" }) {
               </div>
             ) : (
               <p className="muted">
-                No hay movimientos adicionales. El stock demo se cargó como
-                existencia inicial.
+                No hay movimientos registrados para este artículo.
               </p>
             )}
           </div>

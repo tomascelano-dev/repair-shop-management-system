@@ -670,8 +670,15 @@ function PlanTab() {
           },
           {
             label: "Cobro",
-            value: d.provider === "MercadoPago" ? "Mercado Pago" : "Simulado",
-            hint: s.payerEmail || "Débito automático mensual",
+            value:
+              d.provider === "MercadoPago"
+                ? "Mercado Pago"
+                : "Sin cargo (beta)",
+            hint:
+              s.payerEmail ||
+              (d.provider === "MercadoPago"
+                ? "Débito automático mensual"
+                : "Durante la beta no se generan cobros"),
           },
         ]}
       />
@@ -786,11 +793,11 @@ export function SimulatedCheckout() {
   return (
     <div className="checkout-page">
       <section className="panel padded">
-        <span className="eyebrow">COBRO SIMULADO</span>
+        <span className="eyebrow">ACTIVACIÓN DE PLAN</span>
         <h1>Confirmar suscripción</h1>
         <p>
-          Este servidor no tiene Mercado Pago configurado. Confirmá para simular
-          un pago aprobado y activar el plan.
+          Durante la beta, la activación de planes no genera cobros. Confirmá
+          para activar el plan elegido.
         </p>
         <ErrorBox message={error} />
         <div className="form-actions">
@@ -817,7 +824,7 @@ export function SimulatedCheckout() {
               }
             }}
           >
-            Simular pago aprobado
+            Activar plan
           </button>
         </div>
       </section>
@@ -861,9 +868,9 @@ function FiscalTab() {
       <ErrorBox message={error} />
       {s.serverProvider !== "Arca" && (
         <div className="info-box">
-          Este servidor emite comprobantes simulados (sin validez fiscal). Para
-          facturar con ARCA, el administrador del servidor debe activar el
-          proveedor ARCA.
+          La factura electrónica con ARCA todavía no está disponible en tu
+          cuenta. Mientras tanto, los comprobantes se emiten como internos, sin
+          validez fiscal.
         </div>
       )}
       <Section

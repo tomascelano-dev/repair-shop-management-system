@@ -65,6 +65,7 @@ import {
 } from "./saas/session";
 import { Tracking, Booking, Survey, Signup } from "./saas/Public";
 import Settings, { SimulatedCheckout } from "./saas/Settings";
+import { Privacy, Terms } from "./saas/Legal";
 import Cash from "./saas/Cash";
 import Invoices, { InvoicePrint } from "./saas/Invoices";
 import Agenda from "./saas/Agenda";
@@ -124,6 +125,8 @@ function PublicApp() {
         <Route path="/seguimiento/:slug" element={<Tracking />} />
         <Route path="/turnos/:slug" element={<Booking />} />
         <Route path="/encuesta/:token" element={<Survey />} />
+        <Route path="/terminos" element={<Terms />} />
+        <Route path="/privacidad" element={<Privacy />} />
       </Routes>
       <Toaster richColors />
     </>
@@ -135,6 +138,8 @@ const publicPaths = [
   "/seguimiento/",
   "/turnos/",
   "/encuesta/",
+  "/terminos",
+  "/privacidad",
 ];
 
 export default function App() {
@@ -459,7 +464,7 @@ export default function App() {
               />
             </Routes>
             <footer className="page-footer">
-              <span>RepairShop v2</span>
+              <span>RepairShop</span>
               <span>
                 <ShieldCheck size={13} />
                 Tus datos, con copias de seguridad diarias
@@ -495,7 +500,7 @@ function Login({ onLogin }: { onLogin: () => void }) {
       <div className="login-story">
         <Brand />
         <div>
-          <span className="eyebrow light">REPAIRSHOP V2</span>
+          <span className="eyebrow light">GESTIÓN PARA TALLERES</span>
           <h1>
             Tu taller.
             <br />
