@@ -230,7 +230,7 @@ public sealed class IntegrationsController(RepairShopDbContext db, IDataProtecti
 public sealed class ApiKeyAuthenticationHandler(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder, RepairShopDbContext db, SubscriptionService subscriptions)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
-    public const string Scheme = "ApiKey";
+    public new const string Scheme = "ApiKey";
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {

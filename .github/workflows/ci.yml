@@ -65,6 +65,7 @@ jobs:
       Saas__Billing__Provider: Simulated
       Saas__Fiscal__Provider: Simulated
       Saas__Messaging__Provider: Log
+      Seed__Enabled: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

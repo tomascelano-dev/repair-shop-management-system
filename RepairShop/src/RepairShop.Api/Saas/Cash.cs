@@ -25,7 +25,7 @@ public sealed record AccountChargeRequest(decimal Amount, string Currency, strin
 public sealed record OrderToAccountRequest(int Version);
 
 [ApiController, Authorize, Route("api/saas")]
-public sealed class CashController(RepairShopDbContext db, SaasEvents events) : SaasController(db)
+public sealed class CashController(RepairShopDbContext db) : SaasController(db)
 {
     private async Task<CashSession?> OpenSession() =>
         await Db.CashSessions.FromSqlInterpolated($"SELECT * FROM saas_cash_session WHERE \"ShopId\"={Shop} AND \"Status\"='Open' ORDER BY \"CreatedAtUtc\" LIMIT 1 FOR UPDATE").FirstOrDefaultAsync();
