@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: repairshop-v2-local-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: repairshop_v2
+      POSTGRES_USER: repairshop
+      POSTGRES_PASSWORD: ${REPAIRSHOP_DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5482:5432"
+    volumes:
+      - repairshop_v2_local_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U repairshop -d repairshop_v2"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  repairshop_v2_local_data:

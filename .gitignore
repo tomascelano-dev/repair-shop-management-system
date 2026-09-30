@@ -1,38 +1,10 @@
-# Environment
-.env
-.env.*
-!.env.example
-!.env.*.example
-
-# .NET
-bin/
-obj/
-.vs/
-*.user
-*.suo
-
-# Node / Frontend
-node_modules/
-dist/
-.vite/
-
-# Logs
-*.log
+.env.local
+**/appsettings.*.Local.json
+**/node_modules/
+**/bin/
+**/obj/
+**/dist/
+**/data/
 logs/
-
-# Local app settings
-appsettings.Local.json
-appsettings.*.local.json
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Archives / backups
-*.zip
-*.rar
-*.7z
-*.bak
-*copy*
-*final*
-*fixed*
+.tools/
+backups/

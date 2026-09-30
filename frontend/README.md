@@ -1,58 +1,70 @@
-# RepairShop Web (Frontend)
+# RepairShop Frontend (React)
 
-Frontend (React) del panel **RepairShop**. Consumí la API `/api/v1` y ofrece UX de panel: órdenes, clientes, equipos, inventario, plantillas y auditoría.
+Frontend en **React + TypeScript + Vite** alineado al backend **RepairShop.Api** (controllers: Auth/Orders/Customers/Devices/Templates/Inventory/Dashboard).
 
-## Qué incluye (producto)
+## Requisitos
+- Node.js 18+ (ideal 20+)
+- Backend corriendo en local
 
-- Login con JWT (roles `Admin` / `Tech`).
-- Navegación por módulos (Dashboard, Órdenes, Clientes, Equipos, Inventario, Plantillas).
-- Manejo de **expiración de token**: si el backend responde 401 → se limpia sesión y se vuelve a login.
-- UX de errores consistente:
-  - **401**: sesión vencida → logout + aviso.
-  - **403**: sin permisos → pantalla/alerta “No autorizado”.
-  - **500/Network**: fallback con mensaje claro.
+## Cómo correrlo (DEV)
 
-## Demo (credenciales seed)
-
-Cuando el backend corre en **DEV** con seed habilitado:
-
-- **Admin**: `admin@local` / `Admin12345`
-- **Tech**: `tech@local` / `Tech123456`
-
-## Configuración
-
-La app necesita la URL base del backend.
-
-### Desarrollo
-
-Crear `.env.local`:
-
+### 1) Levantar el backend
+Desde la raíz de tu solución:
 ```bash
-VITE_API_BASE=http://localhost:8080/api/v1
+cd RepairShop/src/RepairShop.Api
+# o desde donde tengas la solución
+
+dotnet run
 ```
+Por defecto (docker-compose del backend) suele quedar en:
+- `http://localhost:8080`
+- Swagger: `http://localhost:8080/swagger`
 
-Run:
+Usuarios seed (Development):
+- `admin@local` / `admin1234` (role Admin)
+- `tech@local` / `tech1234` (role Tech)
 
+### 2) Levantar el frontend
 ```bash
-npm i
+cd repairshop-frontend
+npm install
 npm run dev
 ```
+Vite levanta en `http://localhost:5173`.
 
-### Producción
+> En DEV, Vite hace proxy de `/api` hacia `VITE_PROXY_TARGET` (default `http://localhost:8080`, ver `vite.config.ts`).
 
-En Cloudflare Pages / VPS (estático):
+## Config (Producción)
+Si vas a servir el frontend en otro dominio/origen, podés setear:
+- `VITE_API_BASE=https://tu-dominio.com/api`
 
-```bash
-npm run build
+Ejemplo `.env`:
+```env
+VITE_API_BASE=https://example.com/api
 ```
 
-Variables recomendadas:
+## Qué cubre
+- Login (JWT) con guard de rutas
+- React Query (cache + invalidación)
+- Dashboard (summary)
+- CRUD: Clientes, Equipos, Órdenes
+- Órdenes PRO:
+  - Cambiar status (con suggested message)
+  - Historial
+  - Notas y adjuntos
+  - Cotización (quote)
+  - Pagos
+  - Checklist recepción
+  - Auditoría
+  - Preview de mensaje por templateKey
+- Inventario:
+  - Listado + alta/edición
+  - Ajustes
+  - Consumo de partes en orden (desde detalle)
+- Plantillas:
+  - Listado + alta/edición
 
-- `VITE_API_BASE=https://TU_API_DOMAIN/api/v1`
+## Notas importantes
+- Algunos endpoints están protegidos por rol `Admin` (creación/edición de inventory/templates, delete, etc.).
+- Cuando el backend expone enums como números en requests, el frontend envía valores numéricos.
 
-> Importante: en prod, asegurate de tener **HTTPS** y configurar **CORS** en backend con tu dominio del frontend.
-
-## Notas
-
-- El backend expone healthchecks (`/healthz`, `/readyz`) para monitoreo.
-- Si cambiás el prefijo de API, actualizá `VITE_API_BASE` (por default es `/api/v1`).

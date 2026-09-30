@@ -9,8 +9,6 @@ import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
 import { Button } from '../components/ui/Button'
 import { Table, TBody, TD, TH, THead, TR } from '../components/ui/Table'
-import { problemDetailsToText, toProblemDetails } from '../api/client'
-import { toastApiError } from '../lib/apiError'
 
 const emptyForm: CustomerCreateRequest = { fullName: '', phone: '', notes: '' }
 
@@ -31,22 +29,8 @@ export default function CustomersPage() {
   const save = useMutation({
     mutationFn: async () => {
       if (!isAdmin) throw new Error('Admin only')
-
-      // Client-side guardrails (match backend rules) to avoid opaque 400s.
-      const fullName = (form.fullName ?? '').trim()
-      const phone = (form.phone ?? '').trim()
-      if (fullName.length < 3) throw new Error('Nombre: mínimo 3 caracteres.')
-      if (phone.length < 6) throw new Error('Teléfono: mínimo 6 caracteres.')
-      if (![...phone].some((c) => /\d/.test(c))) throw new Error('Teléfono: debe contener dígitos.')
-
-      const payload: CustomerCreateRequest = {
-        fullName,
-        phone,
-        notes: form.notes && form.notes.trim().length > 0 ? form.notes.trim() : null
-      }
-
-      if (editing) return customersApi.update(editing.id, payload)
-      return customersApi.create(payload)
+      if (editing) return customersApi.update(editing.id, form)
+      return customersApi.create(form)
     },
     onSuccess: async () => {
       toast.success(editing ? 'Cliente actualizado' : 'Cliente creado')
@@ -55,12 +39,7 @@ export default function CustomersPage() {
       await qc.invalidateQueries({ queryKey: ['customers'] })
     },
     onError: (e: any) => {
-      const pd = toProblemDetails(e)
-      if (pd) {
-        toast.error('No se pudo guardar', { description: problemDetailsToText(pd) })
-        return
-      }
-      toastApiError('No se pudo guardar', e)
+      toast.error('No se pudo guardar', { description: e?.message })
     }
   })
 
@@ -73,7 +52,7 @@ export default function CustomersPage() {
       toast.success('Cliente eliminado')
       await qc.invalidateQueries({ queryKey: ['customers'] })
     },
-    onError: (e: any) => toastApiError('No se pudo eliminar', e)
+    onError: (e: any) => toast.error('No se pudo eliminar', { description: e?.message })
   })
 
   const filtered = useMemo(() => {

@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 import type { CreateMessageTemplateRequest, MessageTemplateResponse } from '../api/types'
 import { templatesApi } from '../api/repairshop'
 import { useAuth } from '../auth/AuthContext'
-import { toastApiError } from '../lib/apiError'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
@@ -51,7 +50,7 @@ export default function TemplatesPage() {
       setForm(emptyForm)
       await qc.invalidateQueries({ queryKey: ['templates'] })
     },
-    onError: (e: any) => toastApiError('No se pudo guardar', e)
+    onError: (e: any) => toast.error('No se pudo guardar', { description: e?.message })
   })
 
   const remove = useMutation({
@@ -60,7 +59,7 @@ export default function TemplatesPage() {
       toast.success('Plantilla eliminada')
       await qc.invalidateQueries({ queryKey: ['templates'] })
     },
-    onError: (e: any) => toastApiError('No se pudo eliminar', e)
+    onError: (e: any) => toast.error('No se pudo eliminar', { description: e?.message })
   })
 
   const filtered = useMemo(() => {

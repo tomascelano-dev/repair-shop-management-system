@@ -12,8 +12,6 @@ export default function DashboardPage() {
   if (q.isLoading) return <div className="text-sm text-slate-600">Cargando…</div>
   if (q.isError) return <div className="text-sm text-rose-700">No se pudo cargar el dashboard.</div>
 
-  if (!q.data) return <div className="text-sm text-slate-600">Sin datos.</div>
-
   const d = q.data
 
   return (
