@@ -4,11 +4,11 @@ import { toast } from 'sonner'
 import type { CreateInventoryItemRequest, InventoryItemResponse } from '../api/types'
 import { inventoryApi } from '../api/repairshop'
 import { useAuth } from '../auth/AuthContext'
-import { toastApiError } from '../lib/apiError'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
 import { Table, TBody, TD, TH, THead, TR } from '../components/ui/Table'
+import { Textarea } from '../components/ui/Textarea'
 import { Select } from '../components/ui/Select'
 
 const emptyItem: CreateInventoryItemRequest = {
@@ -51,7 +51,7 @@ export default function InventoryPage() {
       setForm(emptyItem)
       await qc.invalidateQueries({ queryKey: ['inventory'] })
     },
-    onError: (e: any) => toastApiError('No se pudo guardar', e)
+    onError: (e: any) => toast.error(e?.message ?? 'Error')
   })
 
   const filtered = useMemo(() => {

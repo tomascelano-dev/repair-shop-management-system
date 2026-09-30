@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -12,8 +12,6 @@ import {
   type UpdateRepairOrderChecklistRequest,
   type RenderOrderMessageRequest
 } from '../api/types'
-import { problemDetailsToText, toProblemDetails } from '../api/client'
-import { toastApiError } from '../lib/apiError'
 import {
   customersApi,
   devicesApi,
@@ -22,6 +20,7 @@ import {
   templatesApi
 } from '../api/repairshop'
 import StatusBadge from '../components/StatusBadge'
+import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
@@ -91,14 +90,7 @@ export default function OrderDetailPage() {
       }
       await refreshAll()
     },
-    onError: (e: any) => {
-      const pd = toProblemDetails(e)
-      if (pd) {
-        toast.error(problemDetailsToText(pd) || 'No se pudo cambiar el estado')
-        return
-      }
-      toastApiError('No se pudo cambiar el estado', e)
-    },
+    onError: (e: any) => toast.error(e?.message ?? 'No se pudo cambiar el estado')
   })
 
   const setQuote = useMutation({
@@ -157,40 +149,12 @@ export default function OrderDetailPage() {
   })
 
   const preview = useMutation({
-    mutationFn: (body: RenderOrderMessageRequest) => ordersApi.preview(orderId, body),
-    onError: (e: any) => {
-      const pd = toProblemDetails(e)
-      if (pd) {
-        toast.error(problemDetailsToText(pd) || 'No se pudo generar el preview')
-        return
-      }
-      toastApiError('No se pudo generar el preview', e)
-    },
+    mutationFn: (body: RenderOrderMessageRequest) => ordersApi.preview(orderId, body)
   })
 
   const statusOptions = useMemo(() => {
     return Object.entries(RepairOrderStatus).map(([k, v]) => ({ key: k, value: v as number }))
   }, [])
-
-  // Keep UI aligned with domain transitions (RepairOrder.MoveTo)
-  const allowedNextStatusValues = useMemo((): number[] => {
-    const s = (order?.status ?? '').toLowerCase()
-    const cancel = RepairOrderStatus.Cancelled as number
-
-    if (s === 'received') return [RepairOrderStatus.Diagnosing as number, cancel]
-    if (s === 'diagnosing') return [RepairOrderStatus.InProgress as number, cancel]
-    if (s === 'inprogress') return [RepairOrderStatus.Ready as number, cancel]
-    if (s === 'ready') return [RepairOrderStatus.Delivered as number, cancel]
-    if (s === 'delivered' || s === 'cancelled') return []
-
-    return statusOptions.map((x) => x.value)
-  }, [order?.status, statusOptions])
-
-  const allowedNextStatusOptions = useMemo(() => {
-    if (allowedNextStatusValues.length === 0) return []
-    const set = new Set(allowedNextStatusValues)
-    return statusOptions.filter((o) => set.has(o.value))
-  }, [allowedNextStatusValues, statusOptions])
 
   const [statusValue, setStatusValue] = useState<number>(RepairOrderStatus.InProgress)
   const [noteBody, setNoteBody] = useState('')
@@ -210,26 +174,13 @@ export default function OrderDetailPage() {
 
   const [tplKey, setTplKey] = useState<string>('order.status.changed')
 
-  // When templates load, select a real key so preview doesn't fail on missing defaults.
-  useEffect(() => {
-    const list = templatesQ.data ?? []
-    if (list.length === 0) return
-    const exists = list.some((t) => (t.key ?? '').toLowerCase() === (tplKey ?? '').toLowerCase())
-    if (!exists) setTplKey(list[0].key)
-  }, [templatesQ.data, tplKey])
-
   // Sync defaults when order loads
-  useEffect(() => {
+  useMemo(() => {
     if (!order) return
-    // Default to the next valid status (not the current one)
-    if (allowedNextStatusValues.length > 0) {
-      setStatusValue(allowedNextStatusValues[0])
-    } else {
-      setStatusValue((RepairOrderStatus as any)[order.status] ?? RepairOrderStatus.Received)
-    }
+    setStatusValue((RepairOrderStatus as any)[order.status] ?? RepairOrderStatus.Received)
     setQuoteAmount(order.quoteAmount != null ? String(order.quoteAmount) : '')
     setQuoteCurrency(order.quoteCurrency ?? 'USD')
-  }, [order, allowedNextStatusValues])
+  }, [order])
 
   if (orderQ.isLoading) return <div className="text-sm text-slate-500">Cargando…</div>
   if (orderQ.isError) return <div className="text-sm text-rose-600">No se pudo cargar la orden.</div>
@@ -377,31 +328,18 @@ export default function OrderDetailPage() {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div>
                 <label className="text-sm font-medium">Nuevo estado</label>
-                <Select
-                  disabled={allowedNextStatusOptions.length === 0}
-                  value={String(statusValue)}
-                  onChange={(e) => setStatusValue(Number(e.target.value))}
-                >
-                  {allowedNextStatusOptions.length === 0 ? (
-                    <option value={String(statusValue)}>(Sin transiciones disponibles)</option>
-                  ) : (
-                    allowedNextStatusOptions.map((o) => (
-                      <option key={o.key} value={o.value}>
-                        {o.key}
-                      </option>
-                    ))
-                  )}
+                <Select value={String(statusValue)} onChange={(e) => setStatusValue(Number(e.target.value))}>
+                  {statusOptions.map((o) => (
+                    <option key={o.key} value={o.value}>
+                      {o.key}
+                    </option>
+                  ))}
                 </Select>
-                <div className="mt-1 text-xs text-slate-500">
-                  {allowedNextStatusOptions.length === 0
-                    ? 'Este estado es final (no hay cambios posibles).'
-                    : 'Mostrando solo transiciones válidas según el flujo del sistema.'}
-                </div>
               </div>
               <div className="flex items-end">
                 <Button
                   variant="primary"
-                  disabled={changeStatus.isPending || allowedNextStatusOptions.length === 0}
+                  disabled={changeStatus.isPending}
                   onClick={() => changeStatus.mutate({ status: statusValue, enqueueOutbox: true, channel: 0 })}
                 >
                   Aplicar
@@ -647,33 +585,16 @@ export default function OrderDetailPage() {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div className="md:col-span-2">
                 <label className="text-sm font-medium">Template</label>
-                <Select
-                  disabled={(templatesQ.data ?? []).length === 0}
-                  value={tplKey}
-                  onChange={(e) => setTplKey(e.target.value)}
-                >
-                  {(templatesQ.data ?? []).length === 0 ? (
-                    <option value={tplKey}>(No hay templates cargados)</option>
-                  ) : (
-                    (templatesQ.data ?? []).map((t) => (
-                      <option key={t.id} value={t.key}>
-                        {t.key} — {t.title}
-                      </option>
-                    ))
-                  )}
+                <Select value={tplKey} onChange={(e) => setTplKey(e.target.value)}>
+                  {(templatesQ.data ?? []).map((t) => (
+                    <option key={t.id} value={t.key}>
+                      {t.key} — {t.title}
+                    </option>
+                  ))}
                 </Select>
-                {(templatesQ.data ?? []).length === 0 ? (
-                  <div className="mt-1 text-xs text-slate-500">
-                    Creá un template en <b>Plantillas</b> para poder generar previews.
-                  </div>
-                ) : null}
               </div>
               <div className="flex items-end">
-                <Button
-                  variant="primary"
-                  disabled={preview.isPending || (templatesQ.data ?? []).length === 0}
-                  onClick={() => preview.mutate({ templateKey: tplKey })}
-                >
+                <Button variant="primary" onClick={() => preview.mutate({ templateKey: tplKey })}>
                   Generar
                 </Button>
               </div>

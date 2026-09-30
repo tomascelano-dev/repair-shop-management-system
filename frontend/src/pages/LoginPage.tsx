@@ -16,23 +16,14 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-// Credenciales de demo (deben existir en la base; ver DbSeeder / comando --seed)
-const DEMO_EMAIL = 'admin@local'
-const DEMO_PASSWORD = 'Admin123456'
-
 export default function LoginPage() {
   const nav = useNavigate()
   const { login, isAuthenticated } = useAuth()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: '', password: '' }
+    defaultValues: { email: 'admin@local', password: 'admin1234' }
   })
-
-  const fillDemo = () => {
-    form.setValue('email', DEMO_EMAIL, { shouldValidate: true })
-    form.setValue('password', DEMO_PASSWORD, { shouldValidate: true })
-  }
 
   useEffect(() => {
     if (isAuthenticated) nav('/app', { replace: true })
@@ -59,41 +50,22 @@ export default function LoginPage() {
             <p className="mt-1 text-sm text-slate-500">Iniciá sesión para acceder al panel.</p>
           </CardHeader>
           <CardContent>
-            <div className="mb-4 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-medium text-sky-900">🔎 Acceso de demo</span>
-                <button
-                  type="button"
-                  onClick={fillDemo}
-                  className="rounded border border-sky-300 bg-white px-2 py-1 text-xs font-medium text-sky-700 hover:bg-sky-100"
-                >
-                  Usar credenciales de demo
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-slate-600">
-                Email: <code className="font-mono text-slate-800">{DEMO_EMAIL}</code>
-                {' · '}
-                Contraseña: <code className="font-mono text-slate-800">{DEMO_PASSWORD}</code>
-              </p>
-            </div>
-
             <form onSubmit={onSubmit} className="space-y-3">
               <div>
                 <label className="text-sm font-medium">Email</label>
-                <Input {...form.register('email')} placeholder="tu@email.com" autoComplete="email" />
+                <Input {...form.register('email')} placeholder="admin@local" />
               </div>
               <div>
                 <label className="text-sm font-medium">Contraseña</label>
-                <Input
-                  {...form.register('password')}
-                  type="password"
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                />
+                <Input {...form.register('password')} type="password" placeholder="••••••" />
               </div>
 
               <div className="pt-2 flex items-center justify-between gap-3">
-                <div className="text-xs text-slate-500">Ingresá con tu cuenta.</div>
+                <div className="text-xs text-slate-500">
+                  DEV seed: <span className="font-mono">admin@local / admin1234</span>
+                  <br />
+                  <span className="font-mono">tech@local / tech1234</span>
+                </div>
                 <Button variant="primary" disabled={form.formState.isSubmitting}>
                   {form.formState.isSubmitting ? 'Entrando…' : 'Entrar'}
                 </Button>
@@ -101,6 +73,11 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
+
+        <div className="mt-4 text-xs text-slate-500">
+          En desarrollo, el frontend usa proxy a <span className="font-mono">VITE_PROXY_TARGET</span> (default:
+          <span className="font-mono"> http://localhost:8080</span>).
+        </div>
       </div>
     </div>
   )

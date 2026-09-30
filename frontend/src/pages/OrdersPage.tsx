@@ -2,10 +2,9 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import type { RepairOrderCreateRequest } from '../api/types'
+import type { RepairOrderCreateRequest, RepairOrderResponse } from '../api/types'
 import { customersApi, devicesApi, ordersApi } from '../api/repairshop'
 import { useAuth } from '../auth/AuthContext'
-import { toastApiError } from '../lib/apiError'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Select } from '../components/ui/Select'
@@ -49,7 +48,7 @@ export default function OrdersPage() {
       setForm(emptyForm)
       await qc.invalidateQueries({ queryKey: ['orders'] })
     },
-    onError: (e: any) => toastApiError('No se pudo crear', e)
+    onError: (e: any) => toast.error('No se pudo crear', { description: e?.message })
   })
 
   const customersById = useMemo(() => {

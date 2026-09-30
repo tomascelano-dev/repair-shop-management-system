@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 import type { DeviceCreateRequest, DeviceResponse } from '../api/types'
 import { customersApi, devicesApi } from '../api/repairshop'
 import { useAuth } from '../auth/AuthContext'
-import { toastApiError } from '../lib/apiError'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Textarea } from '../components/ui/Textarea'
@@ -65,7 +64,7 @@ export default function DevicesPage() {
       setForm(emptyForm)
       await qc.invalidateQueries({ queryKey: ['devices'] })
     },
-    onError: (e: any) => toastApiError('No se pudo guardar', e)
+    onError: (e: any) => toast.error(e?.message ?? 'Error')
   })
 
   const remove = useMutation({
@@ -77,7 +76,7 @@ export default function DevicesPage() {
       toast.success('Equipo eliminado')
       await qc.invalidateQueries({ queryKey: ['devices'] })
     },
-    onError: (e: any) => toastApiError('No se pudo eliminar', e)
+    onError: (e: any) => toast.error(e?.message ?? 'Error')
   })
 
   const filtered = useMemo(() => {
