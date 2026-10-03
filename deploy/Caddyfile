@@ -42,7 +42,9 @@
 		header @assets Cache-Control "public, max-age=31536000, immutable"
 		@other not path /assets/*
 		header @other Cache-Control "no-cache"
-		try_files {path} /index.html
+		# The public pages are pre-rendered at build time (precios.html, terminos.html...) so they have content
+		# without JavaScript; every other route gets the SPA shell.
+		try_files {path} {path}.html /index.html
 		file_server
 	}
 }

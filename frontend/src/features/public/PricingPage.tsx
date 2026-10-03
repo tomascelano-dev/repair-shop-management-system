@@ -47,8 +47,9 @@ export function PublicFooter() {
   )
 }
 
-export function PricingPage() {
-  const [country, setCountry] = useState(detectCountry)
+/** `initialCountry` fixes the currency when the page is pre-rendered to static HTML (there is no browser language there). */
+export function PricingPage({ initialCountry }: { initialCountry?: string } = {}) {
+  const [country, setCountry] = useState(() => initialCountry ?? detectCountry())
   const plans = useQuery({ queryKey: ['plans', billingCountry(country)], queryFn: () => billingApi.plans(billingCountry(country)) })
 
   return (
