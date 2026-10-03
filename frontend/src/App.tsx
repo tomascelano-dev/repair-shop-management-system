@@ -36,6 +36,7 @@ const VerifyEmailPage = page(() => import('./features/public/SignupPage'), 'Veri
 const PricingPage = page(() => import('./features/public/PricingPage'), 'PricingPage')
 const TermsPage = page(() => import('./features/public/LegalPages'), 'TermsPage')
 const PrivacyPage = page(() => import('./features/public/LegalPages'), 'PrivacyPage')
+const RefundPage = page(() => import('./features/public/LegalPages'), 'RefundPage')
 
 function Guard({ permission, children }: { permission: Permission; children: ReactNode }) {
   return <RequirePermission permission={permission}>{children}</RequirePermission>
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="/precios" element={<PricingPage />} />
         <Route path="/terminos" element={<TermsPage />} />
         <Route path="/privacidad" element={<PrivacyPage />} />
+        <Route path="/reembolsos" element={<RefundPage />} />
 
         <Route
           element={

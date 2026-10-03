@@ -31,3 +31,20 @@ test('a new shop signs up, gets the trial and picks a plan', async ({ page }) =>
   await expect(page.getByRole('button', { name: 'Plan actual' })).toBeVisible()
   await expect(page.getByText(/Prueba gratis: te quedan/)).toHaveCount(0)
 })
+
+// Paddle reviews the domain before approving the account: it must show the product and prices and link these pages.
+test('the bare domain shows the pricing page, which links terms, privacy and refund policy', async ({ page }) => {
+  await page.goto('/')
+  await expect(page).toHaveURL(/\/precios$/)
+  const footer = page.getByRole('contentinfo')
+  for (const [link, heading] of [
+    ['Términos', 'Términos del servicio'],
+    ['Privacidad', 'Política de privacidad'],
+    ['Reembolsos', 'Política de reembolsos'],
+  ]) {
+    await footer.getByRole('link', { name: link }).click()
+    await expect(page.getByRole('heading', { name: heading })).toBeVisible()
+  }
+  await expect(page.getByText(/dentro de los 14 días corridos/)).toBeVisible()
+  await page.screenshot({ path: 'test-results/reembolsos.png', fullPage: true })
+})

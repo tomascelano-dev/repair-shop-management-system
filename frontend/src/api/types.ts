@@ -1175,6 +1175,10 @@ export interface BillingConfig {
   trialDays: number
   paddleClientToken: string | null
   paddleEnvironment: 'sandbox' | 'production'
+  /** Public support email for the legal pages; null until the platform sets CONTACT_EMAIL. */
+  contactEmail: string | null
+  /** Seller shown in the Terms; null until the platform sets LEGAL_NAME. */
+  legalName: string | null
 }
 
 export interface Subscription {

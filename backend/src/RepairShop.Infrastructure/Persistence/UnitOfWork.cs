@@ -52,7 +52,8 @@ public sealed class UnitOfWork : IUnitOfWork
             catch (ConcurrencyConflictException) when (attempt < maxAttempts && _db.Database.CurrentTransaction is null)
             {
                 _db.ChangeTracker.Clear();
-                await Task.Delay(TimeSpan.FromMilliseconds(25 * attempt), ct);
+                // Jitter, so requests that collided once do not retry in lockstep and collide again.
+                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(10, 40) * attempt), ct);
             }
         }
     }

@@ -154,6 +154,40 @@ public sealed class BillingTests
     }
 
     [IntegrationFact]
+    public async Task Paddle_events_for_the_same_subscription_arriving_together_are_all_accepted()
+    {
+        // Paddle sends subscription.created, .activated and .updated at the same moment after a checkout.
+        var (owner, login) = await ApiClient.SignupAsync(_factory, "US");
+        var org = login.GetProperty("user").Str("organizationId");
+        var anon = _factory.CreateClient();
+        var start = DateTime.UtcNow;
+        string Event(int n, string type) => JsonSerializer.Serialize(new
+        {
+            event_id = $"evt_burst_{n}",
+            event_type = type,
+            occurred_at = start.AddMilliseconds(n).ToString("O"),
+            data = new
+            {
+                id = "sub_01burst",
+                status = "active",
+                customer_id = "ctm_01burst",
+                currency_code = "USD",
+                custom_data = new { organization_id = org, plan = "Basic" },
+                current_billing_period = new { starts_at = start.ToString("O"), ends_at = start.AddMonths(1).ToString("O") },
+                items = new[] { new { price = new { id = "pri_basic", unit_price = new { amount = "2500", currency_code = "USD" } } } }
+            }
+        });
+
+        var types = new[] { "subscription.created", "subscription.activated", "subscription.updated", "subscription.updated" };
+        var responses = await Task.WhenAll(types.Select((t, i) => PostPaddleAsync(anon, Event(i, t), ApiFactory.PaddleWebhookSecret)));
+
+        responses.Select(r => r.StatusCode).Should().AllBeEquivalentTo(HttpStatusCode.OK);
+        var sub = await (await owner.Get("/billing/subscription")).DataAsync();
+        sub.Str("status").Should().Be("Active");
+        sub.Str("plan").Should().Be("Basic");
+    }
+
+    [IntegrationFact]
     public async Task Public_price_list_is_in_pesos_for_argentina_and_dollars_elsewhere()
     {
         var anon = _factory.CreateClient();

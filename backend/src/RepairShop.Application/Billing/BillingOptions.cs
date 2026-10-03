@@ -18,6 +18,12 @@ public sealed class BillingOptions
     /// <summary>Allow new shops to sign up from the website.</summary>
     public bool SignupEnabled { get; set; } = true;
 
+    /// <summary>Public support email shown in the Terms, Privacy and Refund pages (Paddle asks for one).</summary>
+    public string ContactEmail { get; set; } = "";
+
+    /// <summary>Name of the person or company that sells the service, shown in the Terms (Paddle asks for it).</summary>
+    public string LegalName { get; set; } = "";
+
     /// <summary>Monthly price per plan in US dollars (Paddle, every country except Argentina). Must match the Paddle prices.</summary>
     public Dictionary<string, decimal> UsdPrices { get; set; } = new() { ["Basic"] = 25m, ["Standard"] = 45m, ["Pro"] = 79m };
 
