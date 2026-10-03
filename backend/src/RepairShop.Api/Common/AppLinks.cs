@@ -32,5 +32,6 @@ public sealed class AppLinks : IAppLinks
     public string Order(Guid orderId) => $"{_web}/orders/{orderId}";
     public string VerifyEmail(string token) => $"{_web}/verificar-email?token={Uri.EscapeDataString(token)}";
     public string Billing() => $"{_web}/billing";
+    public string Web(string path) => $"{_web}{path}";
     public string ApiBase => _api;
 }

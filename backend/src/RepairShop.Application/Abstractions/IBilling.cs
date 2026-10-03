@@ -59,3 +59,12 @@ public sealed record GatewaySubscriptionState(
     string? Currency,
     string? CustomerId,
     DateTime? EventAtUtc);
+
+/// <summary>Campaign data of self-service signups and the conversions queued for the ad platforms.</summary>
+public interface IAdTrackingRepository
+{
+    Task<SignupAttribution?> GetAttributionAsync(Guid organizationId, CancellationToken ct);
+    Task AddAttributionAsync(SignupAttribution attribution, CancellationToken ct);
+    Task<bool> ConversionExistsAsync(string platform, string eventId, CancellationToken ct);
+    Task AddConversionAsync(AdConversion conversion, CancellationToken ct);
+}

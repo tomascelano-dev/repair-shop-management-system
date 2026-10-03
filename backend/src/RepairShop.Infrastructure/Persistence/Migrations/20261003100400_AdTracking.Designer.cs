@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RepairShop.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using RepairShop.Infrastructure.Persistence;
 namespace RepairShop.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(RepairShopDbContext))]
-    partial class RepairShopDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261003100400_AdTracking")]
+    partial class AdTracking
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
