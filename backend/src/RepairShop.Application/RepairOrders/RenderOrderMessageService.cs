@@ -1,23 +1,40 @@
+using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using RepairShop.Application.Abstractions;
 using RepairShop.Application.Common;
 using RepairShop.Application.Contracts;
+using RepairShop.Domain.Common;
+using RepairShop.Domain.Customers;
+using RepairShop.Domain.Devices;
+using RepairShop.Domain.Quotes;
 using RepairShop.Domain.RepairOrders;
+using RepairShop.Domain.Shops;
 
 namespace RepairShop.Application.RepairOrders;
 
+/// <summary>
+/// Renders message templates for an order replacing {{tokens}} (and legacy %tokens%).
+/// </summary>
 public sealed class RenderOrderMessageService
 {
     private static readonly Regex CurlyToken = new(@"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}", RegexOptions.Compiled);
     private static readonly Regex PercentToken = new(@"%([a-zA-Z0-9_]+)%", RegexOptions.Compiled);
+    private static readonly CultureInfo Es = CultureInfo.InvariantCulture;
+
+    // Argentine number format (1.234,56) without depending on ICU culture data (InvariantGlobalization).
+    public static readonly NumberFormatInfo ArNumbers = new() { NumberDecimalSeparator = ",", NumberGroupSeparator = "." };
 
     private readonly IShopRepository _shops;
     private readonly IMessageTemplateRepository _templates;
     private readonly IRepairOrderRepository _orders;
     private readonly ICustomerRepository _customers;
     private readonly IDeviceRepository _devices;
-    private readonly IRepairOrderPaymentRepository _payments;
     private readonly IRepairOrderReceptionChecklistRepository _checklists;
+    private readonly IQuoteRepository _quotes;
+    private readonly IUserRepository _users;
+    private readonly IRepairOrderReadModel _readModel;
+    private readonly IAppLinks _links;
 
     public RenderOrderMessageService(
         IShopRepository shops,
@@ -25,166 +42,177 @@ public sealed class RenderOrderMessageService
         IRepairOrderRepository orders,
         ICustomerRepository customers,
         IDeviceRepository devices,
-        IRepairOrderPaymentRepository payments,
-        IRepairOrderReceptionChecklistRepository checklists)
+        IRepairOrderReceptionChecklistRepository checklists,
+        IQuoteRepository quotes,
+        IUserRepository users,
+        IRepairOrderReadModel readModel,
+        IAppLinks links)
     {
         _shops = shops;
         _templates = templates;
         _orders = orders;
         _customers = customers;
         _devices = devices;
-        _payments = payments;
         _checklists = checklists;
+        _quotes = quotes;
+        _users = users;
+        _readModel = readModel;
+        _links = links;
     }
 
     public async Task<MessagePreviewResponse> RenderAsync(Guid shopId, Guid orderId, string templateKey, bool allowFallback, CancellationToken ct)
     {
         templateKey = (templateKey ?? "").Trim().ToLowerInvariant();
-        if (templateKey.Length < 3) throw new NotFoundException("Template key is required.");
+        if (templateKey.Length < 3) throw new NotFoundException("Falta la clave de la plantilla.");
 
         var template = await _templates.GetByKeyAsync(shopId, templateKey, ct);
-        if (template is null)
+        if (template is null || !template.IsActive)
         {
-            if (!allowFallback) throw new NotFoundException($"Template not found: '{templateKey}'.");
-            return new MessagePreviewResponse(templateKey, "Auto", BuildFallbackMessage(orderId, templateKey));
+            if (!allowFallback) throw new NotFoundException($"No existe la plantilla '{templateKey}' (o está inactiva).");
         }
 
         var order = await _orders.GetByIdAsync(shopId, orderId, ct);
         if (order is null)
         {
-            if (!allowFallback) throw new NotFoundException("Order not found.");
-            return new MessagePreviewResponse(templateKey, template.Title, template.Body);
+            if (!allowFallback) throw new NotFoundException("Orden no encontrada.");
+            return new MessagePreviewResponse(templateKey, template?.Title ?? "Aviso", template?.Body ?? "");
         }
 
-        var customer = await _customers.GetByIdAsync(shopId, order.CustomerId, ct);
-        var device = await _devices.GetByIdAsync(shopId, order.DeviceId, ct);
-        var shop = await _shops.GetByIdAsync(shopId, ct);
-
-        var paidTotal = await _payments.SumByOrderAsync(shopId, orderId, ct);
-        var checklist = await _checklists.GetByOrderAsync(shopId, orderId, ct);
-
-        var tokens = BuildTokens(shop, order, customer, device, paidTotal, checklist);
-        var body = ReplaceTokens(template.Body, tokens);
-
-        return new MessagePreviewResponse(template.Key, template.Title, body);
+        var tokens = await BuildTokensAsync(shopId, order, ct);
+        var title = template?.Title ?? "Aviso";
+        var body = template is null ? BuildFallbackMessage(order, tokens) : ReplaceTokens(template.Body, tokens);
+        var phone = tokens.GetValueOrDefault("customer_whatsapp", "");
+        return new MessagePreviewResponse(templateKey, ReplaceTokens(title, tokens), body,
+            string.IsNullOrEmpty(phone) ? null : WhatsAppLink(phone, body), tokens.GetValueOrDefault("customer_phone"));
     }
 
-    private static string BuildFallbackMessage(Guid orderId, string templateKey)
-        => $"[TEMPLATE MISSING: {templateKey}] Pedido {orderId}";
+    public static string WhatsAppLink(string digits, string text)
+        => $"https://wa.me/{digits}?text={Uri.EscapeDataString(text ?? "")}";
 
-    private static Dictionary<string, string> BuildTokens(
-        RepairShop.Domain.Shops.Shop? shop,
-        RepairOrder order,
-        RepairShop.Domain.Customers.Customer? customer,
-        RepairShop.Domain.Devices.Device? device,
-        decimal paidTotal,
-        RepairOrderReceptionChecklist? checklist)
+    public async Task<Dictionary<string, string>> BuildTokensAsync(Guid shopId, RepairOrder order, CancellationToken ct)
     {
-        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var shop = await _shops.GetByIdAsync(shopId, ct);
+        var customer = await _customers.GetByIdAsync(shopId, order.CustomerId, ct);
+        var device = await _devices.GetByIdAsync(shopId, order.DeviceId, ct);
+        var checklist = await _checklists.GetByOrderAsync(shopId, order.Id, ct);
+        var quotes = await _quotes.ListByOrderAsync(shopId, order.Id, ct);
+        var tech = order.AssignedTechnicianId is null ? null : await _users.GetByIdAsync(order.AssignedTechnicianId.Value, ct);
+        var info = (await _readModel.GetInfoAsync(shopId, new[] { order.Id }, ct)).GetValueOrDefault(order.Id);
 
-        dict["order_id"] = order.Id.ToString();
-        dict["order_status"] = order.Status.ToString();
-        dict["order_created_at"] = order.CreatedAtUtc.ToString("yyyy-MM-dd");
-        dict["order_updated_at"] = order.UpdatedAtUtc.ToString("yyyy-MM-dd");
-        dict["issue_description"] = order.IssueDescription;
-        dict["notes"] = order.Notes ?? "";
+        var tz = ResolveTimeZone(shop?.TimeZone);
+        string Date(DateTime? utc) => utc is null ? "" : TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc.Value, DateTimeKind.Utc), tz).ToString("dd/MM/yyyy", Es);
 
-        dict["quote_amount"] = order.QuoteAmount?.ToString("0.00") ?? "";
-        dict["quote_currency"] = order.QuoteCurrency ?? "";
-        dict["paid_total"] = paidTotal.ToString("0.00");
+        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["order_id"] = order.Id.ToString(),
+            ["order_code"] = order.Code,
+            ["order_number"] = order.OrderNumber.ToString(Es),
+            ["order_status"] = order.Status.ToString(),
+            ["order_status_label"] = OrderLabels.Status(order.Status),
+            ["order_created_at"] = Date(order.CreatedAtUtc),
+            ["order_updated_at"] = Date(order.UpdatedAtUtc),
+            ["promised_date"] = Date(order.PromisedAtUtc),
+            ["issue_description"] = order.IssueDescription,
+            ["notes"] = order.Notes ?? "",
+            ["tracking_url"] = _links.Tracking(order.PublicToken),
+            ["feedback_url"] = _links.Feedback(order.PublicToken),
+            ["technician_name"] = tech?.DisplayName ?? "el equipo técnico",
+            ["warranty_days"] = (order.WarrantyDays ?? shop?.DefaultWarrantyDays ?? 0).ToString(Es),
+            ["warranty_expires_at"] = Date(order.WarrantyExpiresAtUtc),
+            ["cancellation_reason"] = order.CancellationReason ?? ""
+        };
 
-        var quote = order.QuoteAmount ?? 0m;
-        dict["balance_due"] = (quote - paidTotal).ToString("0.00");
+        // Money: agreed price + extras - payments.
+        var money = info is null ? null : OrderMapping.Financials(order, info, shop?.DefaultCurrency ?? "ARS");
+        var currency = money?.Currency ?? order.QuoteCurrency ?? shop?.DefaultCurrency ?? "ARS";
+        dict["paid_total"] = Format(money?.Paid ?? 0m);
+        dict["balance_due"] = Format(Math.Max(0, money?.BalanceDue ?? 0m));
+        dict["order_total"] = Format(money?.Total ?? order.QuoteAmount ?? 0m);
+        dict["currency"] = currency;
 
-        if (customer is not null)
-        {
-            dict["customer_name"] = customer.FullName;
-            dict["customer_phone"] = customer.Phone;
-        }
-        else
-        {
-            dict["customer_name"] = "";
-            dict["customer_phone"] = "";
-        }
+        // Quote: the most relevant one (open > approved > latest).
+        var quote = quotes.FirstOrDefault(q => q.IsOpen)
+                    ?? quotes.FirstOrDefault(q => q.Status == QuoteStatus.Approved)
+                    ?? quotes.FirstOrDefault();
+        dict["quote_amount"] = quote is not null ? Format(quote.Total) : order.QuoteAmount is null ? "" : Format(order.QuoteAmount.Value);
+        dict["quote_currency"] = quote?.Currency ?? order.QuoteCurrency ?? currency;
+        dict["quote_valid_until"] = Date(quote?.ValidUntilUtc);
+        dict["quote_items"] = quote is null ? "" : string.Join("\n", quote.Items.Select(i => $"• {i.Description}: {Format(i.LineTotal)} {quote.Currency}"));
+        if (quote?.WarrantyDays is not null) dict["warranty_days"] = quote.WarrantyDays.Value.ToString(Es);
 
-        if (device is not null)
-        {
-            dict["device_brand"] = device.Brand;
-            dict["device_model"] = device.Model;
-            dict["device_label"] = device.Label ?? "";
-            dict["device_serial"] = device.SerialNumber ?? "";
-        }
-        else
-        {
-            dict["device_brand"] = "";
-            dict["device_model"] = "";
-            dict["device_label"] = "";
-            dict["device_serial"] = "";
-        }
-
-        if (shop is not null)
-        {
-            dict["shop_name"] = shop.Name;
-            dict["shop_phone"] = shop.Phone ?? "";
-            dict["shop_address"] = shop.AddressLine ?? "";
-            dict["shop_city"] = shop.City ?? "";
-            dict["shop_country"] = shop.Country ?? "";
-        }
-        else
-        {
-            dict["shop_name"] = "";
-            dict["shop_phone"] = "";
-            dict["shop_address"] = "";
-            dict["shop_city"] = "";
-            dict["shop_country"] = "";
-        }
-
-        if (checklist is not null)
-        {
-            dict["check_screen_ok"] = checklist.ScreenOk ? "SI" : "NO";
-            dict["check_cameras_ok"] = checklist.CamerasOk ? "SI" : "NO";
-            dict["check_speakers_ok"] = checklist.SpeakersOk ? "SI" : "NO";
-            dict["check_microphone_ok"] = checklist.MicrophoneOk ? "SI" : "NO";
-            dict["check_buttons_ok"] = checklist.ButtonsOk ? "SI" : "NO";
-            dict["check_faceid_ok"] = checklist.FaceIdOk ? "SI" : "NO";
-            dict["check_fingerprint_ok"] = checklist.FingerprintOk ? "SI" : "NO";
-            dict["check_cloud_lock"] = checklist.CloudLock.ToString();
-            dict["check_battery_percent"] = checklist.BatteryPercent?.ToString() ?? "";
-            dict["check_cosmetic_notes"] = checklist.CosmeticNotes ?? "";
-        }
-        else
-        {
-            dict["check_screen_ok"] = "";
-            dict["check_cameras_ok"] = "";
-            dict["check_speakers_ok"] = "";
-            dict["check_microphone_ok"] = "";
-            dict["check_buttons_ok"] = "";
-            dict["check_faceid_ok"] = "";
-            dict["check_fingerprint_ok"] = "";
-            dict["check_cloud_lock"] = "";
-            dict["check_battery_percent"] = "";
-            dict["check_cosmetic_notes"] = "";
-        }
-
+        AddCustomer(dict, customer, shop);
+        AddDevice(dict, device);
+        AddShop(dict, shop);
+        AddChecklist(dict, checklist);
         return dict;
     }
 
-    private static string ReplaceTokens(string input, Dictionary<string, string> tokens)
+    private static void AddCustomer(Dictionary<string, string> dict, Customer? customer, Shop? shop)
+    {
+        dict["customer_name"] = customer?.FullName ?? "";
+        dict["customer_first_name"] = customer?.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+        dict["customer_phone"] = customer?.Phone ?? "";
+        dict["customer_whatsapp"] = customer is null ? "" : PhoneNumber.ToWhatsAppDigits(customer.Phone, shop?.PhoneCountryCode ?? "54");
+    }
+
+    private static void AddDevice(Dictionary<string, string> dict, Device? device)
+    {
+        dict["device_brand"] = device?.Brand ?? "";
+        dict["device_model"] = device?.Model ?? "";
+        dict["device_label"] = device?.Label ?? "";
+        dict["device_serial"] = device?.SerialNumber ?? device?.Imei ?? "-";
+        dict["device_imei"] = device?.Imei ?? "";
+    }
+
+    private static void AddShop(Dictionary<string, string> dict, Shop? shop)
+    {
+        dict["shop_name"] = shop?.Name ?? "";
+        dict["shop_phone"] = shop?.Phone ?? "";
+        dict["shop_whatsapp"] = shop?.Phone is null ? "" : PhoneNumber.ToWhatsAppDigits(shop.Phone, shop.PhoneCountryCode);
+        dict["shop_address"] = shop?.AddressLine ?? "";
+        dict["shop_city"] = shop?.City ?? "";
+        dict["shop_country"] = shop?.Country ?? "";
+        dict["pickup_address"] = string.Join(", ", new[] { shop?.AddressLine, shop?.City }.Where(x => !string.IsNullOrWhiteSpace(x)));
+        dict["pickup_hours"] = shop?.PickupHours ?? "";
+        dict["google_review_url"] = shop?.GoogleReviewUrl ?? "";
+    }
+
+    private static void AddChecklist(Dictionary<string, string> dict, RepairOrderReceptionChecklist? checklist)
+    {
+        string YesNo(bool? v) => v is null ? "" : v.Value ? "SI" : "NO";
+        dict["check_screen_ok"] = YesNo(checklist?.ScreenOk);
+        dict["check_cameras_ok"] = YesNo(checklist?.CamerasOk);
+        dict["check_speakers_ok"] = YesNo(checklist?.SpeakersOk);
+        dict["check_microphone_ok"] = YesNo(checklist?.MicrophoneOk);
+        dict["check_buttons_ok"] = YesNo(checklist?.ButtonsOk);
+        dict["check_faceid_ok"] = YesNo(checklist?.FaceIdOk);
+        dict["check_fingerprint_ok"] = YesNo(checklist?.FingerprintOk);
+        dict["check_cloud_lock"] = checklist?.CloudLock.ToString() ?? "";
+        dict["check_battery_percent"] = checklist?.BatteryPercent?.ToString(Es) ?? "";
+        dict["check_cosmetic_notes"] = checklist?.CosmeticNotes ?? "";
+    }
+
+    private static string BuildFallbackMessage(RepairOrder order, IReadOnlyDictionary<string, string> tokens)
+    {
+        var sb = new StringBuilder();
+        sb.Append("Hola ").Append(tokens.GetValueOrDefault("customer_first_name", "")).Append(" 👋\n");
+        sb.Append("Tu orden ").Append(order.Code).Append(" está: ").Append(OrderLabels.Status(order.Status)).Append(".\n");
+        sb.Append("Seguimiento: ").Append(tokens.GetValueOrDefault("tracking_url", "")).Append("\n— ").Append(tokens.GetValueOrDefault("shop_name", ""));
+        return sb.ToString();
+    }
+
+    public static string ReplaceTokens(string input, IReadOnlyDictionary<string, string> tokens)
     {
         input ??= "";
+        var out1 = CurlyToken.Replace(input, m => tokens.TryGetValue(m.Groups[1].Value, out var v) ? v : m.Value);
+        return PercentToken.Replace(out1, m => tokens.TryGetValue(m.Groups[1].Value, out var v) ? v : m.Value);
+    }
 
-        var out1 = CurlyToken.Replace(input, m =>
-        {
-            var key = m.Groups[1].Value;
-            return tokens.TryGetValue(key, out var v) ? v : m.Value;
-        });
+    public static string Format(decimal amount) => amount.ToString("#,0.00", ArNumbers);
 
-        var out2 = PercentToken.Replace(out1, m =>
-        {
-            var key = m.Groups[1].Value;
-            return tokens.TryGetValue(key, out var v) ? v : m.Value;
-        });
-
-        return out2;
+    public static TimeZoneInfo ResolveTimeZone(string? id)
+    {
+        try { return TimeZoneInfo.FindSystemTimeZoneById(string.IsNullOrWhiteSpace(id) ? Shop.DefaultTimeZone : id); }
+        catch { return TimeZoneInfo.CreateCustomTimeZone("AR", TimeSpan.FromHours(-3), "UTC-03", "UTC-03"); }
     }
 }

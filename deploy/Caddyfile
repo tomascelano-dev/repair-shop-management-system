@@ -1,0 +1,48 @@
+# Web container: serves the React build and forwards the API. It listens on plain HTTP; TLS is terminated by
+# the reverse proxy in front (Caddy on the host + Cloudflare). SITE_ROOT and API_UPSTREAM exist for local tests.
+{
+	admin off
+	auto_https off
+	servers {
+		# Requests arrive from the host proxy through Docker's network: trust the X-Forwarded-For it sends and
+		# take the right-most address that is not a private proxy as the client IP.
+		trusted_proxies static private_ranges
+		trusted_proxies_strict
+		client_ip_headers X-Forwarded-For
+	}
+}
+
+:80 {
+	encode zstd gzip
+
+	@api path /api/* /healthz /readyz
+	handle @api {
+		reverse_proxy {$API_UPSTREAM:api:8080} {
+			# One clean entry for the API (it trusts exactly one proxy hop for per-IP rate limits).
+			header_up X-Forwarded-For {client_ip}
+			# The public site is always HTTPS (secure session cookie, HSTS).
+			header_up X-Forwarded-Proto https
+		}
+	}
+
+	handle {
+		root * {$SITE_ROOT:/srv}
+		header {
+			X-Content-Type-Options nosniff
+			X-Frame-Options DENY
+			Referrer-Policy strict-origin-when-cross-origin
+			# Camera only for this site: barcode scanning at the point of sale.
+			Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+			Strict-Transport-Security "max-age=31536000"
+			-Server
+		}
+		# Hashed build files never change; everything else (index.html, sw.js) is revalidated so a deploy
+		# is picked up on the next visit.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@other not path /assets/*
+		header @other Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

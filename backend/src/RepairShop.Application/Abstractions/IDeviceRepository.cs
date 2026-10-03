@@ -6,6 +6,8 @@ public interface IDeviceRepository
 {
     Task<Device?> GetByIdAsync(Guid shopId, Guid id, CancellationToken ct);
     Task<List<Device>> ListByCustomerAsync(Guid shopId, Guid customerId, int skip, int take, CancellationToken ct);
+    Task<(List<Device> Items, int Total)> SearchAsync(Guid shopId, string? q, int skip, int take, CancellationToken ct);
+    Task<int> CountOrdersAsync(Guid shopId, Guid deviceId, CancellationToken ct);
     Task AddAsync(Device device, CancellationToken ct);
     Task RemoveAsync(Device device, CancellationToken ct);
 }

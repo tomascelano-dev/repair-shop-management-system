@@ -1,30 +1,45 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { BrowserRouter } from 'react-router-dom'
 import { Toaster } from 'sonner'
+import type { AxiosError } from 'axios'
 import App from './App'
+import { SessionProvider } from './auth/session'
 import './styles.css'
-import { AuthProvider } from './auth/AuthContext'
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 10_000,
-      retry: 1
-    }
-  }
+      staleTime: 15_000,
+      refetchOnWindowFocus: true,
+      // Don't retry what will fail again (validation, permissions, not found).
+      retry: (count, error) => {
+        const status = (error as AxiosError)?.response?.status
+        if (status && status >= 400 && status < 500 && status !== 408 && status !== 429) return false
+        return count < 2
+      },
+    },
+    mutations: { retry: false },
+  },
 })
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <SessionProvider>
           <App />
-          <Toaster richColors position="top-right" />
-        </BrowserRouter>
-      </AuthProvider>
+        </SessionProvider>
+      </BrowserRouter>
+      <Toaster richColors position="top-right" closeButton />
     </QueryClientProvider>
-  </React.StrictMode>
+  </StrictMode>
 )
+
+// Offline shell + install prompt (production only, so dev hot reload is never cached).
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js').catch(() => undefined)
+  })
+}

@@ -14,12 +14,16 @@ RUN dotnet publish src/RepairShop.Api/RepairShop.Api.csproj -c Release -o /app/p
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
-# Needed for container healthchecks (curl)
+# curl: container healthchecks. fontconfig + DejaVu: text rendering in the PDF documents (QuestPDF).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl libfontconfig1 fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/publish ./
+
+# Uploaded files (photos, signatures, logos) when Storage:Provider=Local. Mount a volume here.
+RUN mkdir -p /app/data/uploads && chown -R app:app /app/data
+USER app
 
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080

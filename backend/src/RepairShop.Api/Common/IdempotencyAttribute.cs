@@ -1,27 +1,29 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using RepairShop.Infrastructure.Idempotency;
 
 namespace RepairShop.Api.Common;
 
 /// <summary>
-/// Minimal idempotency support using the Idempotency-Key header.
-/// If the same key is re-used for the same authenticated user + path, returns the cached response.
-///
-/// NOTE: This is in-memory (single instance). For production multi-replica deployments,
-/// use Redis/DB.
+/// Idempotency-Key support for POST endpoints that create money or stock movements (sales, payments,
+/// orders...). The first response is stored in the database for 24 h and replayed for retries with the
+/// same key and body, across all API instances. A different body with the same key returns 422; a
+/// concurrent duplicate returns 409.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class IdempotentAttribute : Attribute, IAsyncActionFilter
 {
     public const string HeaderName = "Idempotency-Key";
+    public const string ReplayHeader = "X-Idempotency-Replay";
+    private static readonly TimeSpan Ttl = TimeSpan.FromHours(24);
 
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
         var http = context.HttpContext;
-
         if (!http.Request.Headers.TryGetValue(HeaderName, out var raw) || string.IsNullOrWhiteSpace(raw))
         {
             await next();
@@ -29,49 +31,77 @@ public sealed class IdempotentAttribute : Attribute, IAsyncActionFilter
         }
 
         var key = raw.ToString().Trim();
-        if (key.Length > 128) key = key[..128];
-
-        var user = http.User?.Identity?.IsAuthenticated == true
-            ? (http.User.FindFirst("sub")?.Value ?? http.User.FindFirst("id")?.Value ?? "auth")
-            : "anon";
-
-        var cache = http.RequestServices.GetRequiredService<IMemoryCache>();
-        var cacheKey = $"idem::{user}::{http.Request.Path}::{key}";
-
-        if (cache.TryGetValue<IdempotencyCacheEntry>(cacheKey, out var cached))
+        if (key.Length > 200)
         {
-            http.Response.Headers["X-Idempotency-Replay"] = "true";
-            context.Result = new ContentResult
-            {
-                StatusCode = cached.StatusCode,
-                ContentType = cached.ContentType,
-                Content = cached.BodyJson
-            };
+            context.Result = Problem(http, StatusCodes.Status400BadRequest, "El Idempotency-Key es demasiado largo.");
             return;
         }
 
-        var executed = await next();
+        var user = CurrentUser.GetUserId(http.User);
+        var shop = CurrentUser.GetShopId(http.User);
+        var id = Hash($"{user:N}|{shop:N}|{http.Request.Method}|{http.Request.Path}|{key}");
 
-        // Cache only successful JSON object results.
-        if (executed.Result is ObjectResult obj && obj.Value is not null)
+        var jsonOptions = http.RequestServices.GetService<IOptions<JsonOptions>>()?.Value.JsonSerializerOptions
+                          ?? new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var bodyHash = Hash(JsonSerializer.Serialize(context.ActionArguments.Where(a => a.Value is not CancellationToken)
+            .ToDictionary(a => a.Key, a => a.Value), jsonOptions));
+
+        var store = http.RequestServices.GetRequiredService<IdempotencyStore>();
+        var begin = await store.BeginAsync(id, bodyHash, Ttl, http.RequestAborted);
+
+        switch (begin.Outcome)
         {
-            var jsonOpts = http.RequestServices.GetService<IOptions<Microsoft.AspNetCore.Mvc.JsonOptions>>()?.Value?.JsonSerializerOptions;
-            var json = JsonSerializer.Serialize(obj.Value, jsonOpts ?? new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            var ttl = TimeSpan.FromMinutes(10);
+            case IdempotencyOutcome.Replay:
+                http.Response.Headers[ReplayHeader] = "true";
+                context.Result = new ContentResult { StatusCode = begin.StatusCode, ContentType = "application/json", Content = begin.ResponseBody ?? "" };
+                return;
+            case IdempotencyOutcome.InProgress:
+                context.Result = Problem(http, StatusCodes.Status409Conflict, "Esta operación ya se está procesando. Esperá unos segundos.");
+                return;
+            case IdempotencyOutcome.Mismatch:
+                context.Result = Problem(http, StatusCodes.Status422UnprocessableEntity, "El Idempotency-Key ya se usó con otros datos.");
+                return;
+        }
 
-            cache.Set(cacheKey, new IdempotencyCacheEntry
-            {
-                StatusCode = obj.StatusCode ?? 200,
-                ContentType = "application/json",
-                BodyJson = json
-            }, ttl);
+        ActionExecutedContext executed;
+        try
+        {
+            executed = await next();
+        }
+        catch
+        {
+            await store.AbandonAsync(id, CancellationToken.None);
+            throw;
+        }
+
+        if (executed.Exception is not null && !executed.ExceptionHandled)
+        {
+            // Errors (validation, conflicts...) are not stored: the client may fix and retry with the same key.
+            await store.AbandonAsync(id, CancellationToken.None);
+            return;
+        }
+
+        if (executed.Result is ObjectResult obj && (obj.StatusCode ?? 200) is >= 200 and < 300)
+        {
+            var json = obj.Value is null ? "" : JsonSerializer.Serialize(obj.Value, obj.Value.GetType(), jsonOptions);
+            await store.CompleteAsync(id, obj.StatusCode ?? 200, json, CancellationToken.None);
+        }
+        else if (executed.Result is StatusCodeResult sc && sc.StatusCode is >= 200 and < 300)
+        {
+            await store.CompleteAsync(id, sc.StatusCode, null, CancellationToken.None);
+        }
+        else
+        {
+            await store.AbandonAsync(id, CancellationToken.None);
         }
     }
 
-    private sealed class IdempotencyCacheEntry
-    {
-        public int StatusCode { get; init; }
-        public string ContentType { get; init; } = "application/json";
-        public string BodyJson { get; init; } = "{}";
-    }
+    private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+
+    private static ObjectResult Problem(HttpContext http, int status, string detail)
+        => new(new ProblemDetails { Status = status, Title = detail, Detail = detail, Instance = http.Request.Path })
+        {
+            StatusCode = status,
+            ContentTypes = { "application/problem+json" }
+        };
 }

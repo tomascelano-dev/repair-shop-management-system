@@ -1,6 +1,8 @@
+using RepairShop.Domain.Common;
+
 namespace RepairShop.Domain.RepairOrders;
 
-public sealed class RepairOrderStatusHistory
+public sealed class RepairOrderStatusHistory : IShopScoped
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
 
@@ -13,6 +15,8 @@ public sealed class RepairOrderStatusHistory
     public Guid ChangedByUserId { get; private set; }
     public DateTime ChangedAtUtc { get; private set; }
 
+    public string? Reason { get; private set; }
+
     private RepairOrderStatusHistory() { } // EF
 
     public RepairOrderStatusHistory(
@@ -21,7 +25,8 @@ public sealed class RepairOrderStatusHistory
         RepairOrderStatus fromStatus,
         RepairOrderStatus toStatus,
         Guid changedByUserId,
-        DateTime changedAtUtc)
+        DateTime changedAtUtc,
+        string? reason = null)
     {
         ShopId = shopId;
         RepairOrderId = repairOrderId;
@@ -29,6 +34,7 @@ public sealed class RepairOrderStatusHistory
         ToStatus = toStatus;
         ChangedByUserId = changedByUserId;
         ChangedAtUtc = changedAtUtc;
+        Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim()[..Math.Min(reason.Trim().Length, 300)];
     }
 
     // Back-compat

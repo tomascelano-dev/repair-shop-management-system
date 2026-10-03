@@ -1,5 +1,6 @@
 namespace RepairShop.Domain.RepairOrders;
 
+// NOTE: values are persisted as integers. Never renumber.
 public enum PaymentMethod
 {
     Cash = 0,

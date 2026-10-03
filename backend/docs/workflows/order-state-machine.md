@@ -1,55 +1,79 @@
-# State machine de Órdenes
+# State machine de órdenes
 
-Este documento describe los **estados**, **transiciones permitidas** y **reglas** que el backend aplica para una orden (`RepairOrder`).
+Estados, transiciones permitidas y reglas que el backend aplica a una orden (`RepairOrder`).
 
-> Fuente de verdad: dominio (`RepairOrder.MoveTo`). El frontend solo refleja lo que el backend permite.
+> Fuente de verdad: el dominio (`RepairOrder.AllowedTransitions` y `RepairOrder.MoveTo`) más los permisos de `ChangeOrderStatusService`. El frontend muestra solo lo que la API devuelve en `allowedNextStatuses` y explica de antemano por qué un paso está bloqueado, pero la API vuelve a validar todo.
 
 ## Estados
 
-- `Received` (0) — ingresó al sistema (recepción).
-- `Diagnosing` (1) — diagnóstico en curso.
-- `InProgress` (2) — reparación/trabajo en curso.
-- `Ready` (3) — lista para finalizar/cerrar.
-- `Completed` (4) — finalizada (lista para entregar).
-- `Delivered` (5) — entregada.
-- `Cancelled` (6) — cancelada.
+| Estado | Etiqueta | Significado |
+| --- | --- | --- |
+| `Received` | Recibido | Ingresó el equipo (checklist, firma y código de desbloqueo en la recepción). |
+| `Diagnosing` | En diagnóstico | Se está revisando y presupuestando. |
+| `WaitingParts` | Esperando repuesto | Presupuesto aprobado, falta un repuesto. |
+| `InProgress` | En reparación | Trabajo en curso. |
+| `Testing` | En pruebas | Pruebas antes del control de calidad. |
+| `Ready` | Listo para retirar | Pasó el control de calidad; se avisa al cliente. |
+| `Delivered` | Entregado | Final. Empieza a correr la garantía. |
+| `Cancelled` | Cancelado | Final. Con motivo. |
 
 ## Diagrama
 
 ```mermaid
 flowchart LR
-  R[Received] --> D[Diagnosing]
-  D --> P[InProgress]
-  P --> Y[Ready]
-  Y --> C[Completed]
-  C --> L[Delivered]
+  R[Recibido] --> D[En diagnóstico]
+  D -->|presupuesto aprobado| P[En reparación]
+  D -->|presupuesto aprobado| W[Esperando repuesto]
+  W --> P
+  P --> W
+  P --> T[En pruebas]
+  T --> P
+  P -->|QA aprobado| Y[Listo para retirar]
+  T -->|QA aprobado| Y
+  Y -->|saldo en cero| E[Entregado]
+  Y -->|reproceso: nuevo QA| P
 
-  R --> X[Cancelled]
+  R --> X[Cancelado]
   D --> X
+  W --> X
   P --> X
+  T --> X
   Y --> X
 ```
 
 ## Transiciones permitidas
 
-| From | To (permitidos) |
-|---|---|
+| Desde | Hacia |
+| --- | --- |
 | `Received` | `Diagnosing`, `Cancelled` |
-| `Diagnosing` | `InProgress`, `Cancelled` |
-| `InProgress` | `Ready`, `Cancelled` |
-| `Ready` | `Completed`, `Cancelled` |
-| `Completed` | `Delivered` |
-| `Delivered` | *(ninguna)* |
-| `Cancelled` | *(ninguna)* |
+| `Diagnosing` | `InProgress`, `WaitingParts`, `Cancelled` |
+| `WaitingParts` | `InProgress`, `Cancelled` |
+| `InProgress` | `WaitingParts`, `Testing`, `Ready`, `Cancelled` |
+| `Testing` | `InProgress`, `Ready`, `Cancelled` |
+| `Ready` | `Delivered`, `InProgress`, `Cancelled` |
+| `Delivered` | — |
+| `Cancelled` | — |
 
-## Reglas operativas
+## Reglas
 
-1. **No hay saltos**: no podés ir `Received → InProgress` ni `Diagnosing → Ready`, etc.
-2. **Cancelación**: solo es posible hasta `Ready` (inclusive). Una vez `Completed`, solo `Delivered`.
-3. **Auditoría**: cada cambio de estado genera un evento de auditoría con `from/to` y `actor`.
-4. **Side-effects** (best-effort): el cambio de estado persiste y luego se intenta generar outbox/preview; si el side-effect falla no debería revertir el cambio (para evitar bloqueos operativos).
+1. **Presupuesto aprobado para reparar.** `Diagnosing → InProgress | WaitingParts` exige un presupuesto aprobado (por el cliente desde el portal o registrado por el taller) o un precio acordado en la orden. Los **reingresos por garantía** están exentos.
+2. **Control de calidad para “Listo”.** Pasar a `Ready` exige el checklist de QA de salida aprobado. Si la orden vuelve de `Testing`/`Ready` a `InProgress` (reproceso), el QA anterior se invalida y hay que hacerlo de nuevo.
+3. **Saldo en cero para entregar.** `Ready → Delivered` exige saldo pendiente ≤ 0. Solo un **administrador** puede forzar la entrega con saldo (`forceUnpaidDelivery`), y queda auditado.
+4. **Caja solo entrega.** Un usuario con rol **Caja** solo puede registrar la entrega (`Delivered`).
+5. **Al entregar**: se fija la garantía (días del presupuesto aprobado o de la sucursal) y su vencimiento, y se borra el código de desbloqueo cifrado.
+6. **Al cancelar**: motivo obligatorio (máx. 300 caracteres, se informa al cliente), se liberan las reservas de stock, los presupuestos abiertos quedan reemplazados y se borra el código de desbloqueo.
+7. **Estados finales**: `Delivered` y `Cancelled` no cambian más. Un problema posterior se maneja con un **reclamo de garantía**, que crea una orden nueva vinculada a la original.
 
-## Cómo diagnosticar errores al cambiar de estado
+## Efectos de cada cambio
 
-- Si el backend devuelve **400**: casi siempre es **regla de transición** (estado inválido) o **payload inválido**.
-- Si devuelve **500**: es un bug o fallo en un side-effect. Revisá logs del request (correlation-id) y la excepción.
+- Se guarda en el **historial** (desde/hacia, usuario, motivo) y en la **auditoría**.
+- Si se pide aviso al cliente, se encola un mensaje en el **outbox** con la plantilla del estado (`order.status.*`). El cambio de estado se confirma aunque el envío falle: el mensaje se reintenta en segundo plano y la API devuelve además el link de WhatsApp para enviarlo a mano.
+- `Ready` inicia el reloj de retiro: los recordatorios automáticos usan los días configurados en la sucursal (`readyReminderDays`).
+- El portal del cliente (`/t/:token`) refleja el estado y la línea de tiempo al instante.
+
+## Errores típicos
+
+- **400** con mensaje de negocio: transición inválida o regla incumplida (presupuesto, QA, saldo, motivo).
+- **403**: el rol no puede hacer ese cambio (Caja fuera de la entrega, entrega forzada sin ser admin).
+- **409**: otro usuario modificó la orden al mismo tiempo; recargá y reintentá.
+- **500**: bug. Buscá el `correlationId` de la respuesta en los logs.
