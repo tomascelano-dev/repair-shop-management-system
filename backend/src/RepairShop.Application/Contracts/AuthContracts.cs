@@ -22,7 +22,8 @@ public sealed record UserResponse(
     string DisplayName,
     string Role,
     string? ShopName = null,
-    Guid? OrganizationId = null
+    Guid? OrganizationId = null,
+    bool EmailVerified = true
 );
 
 public sealed record ShopAccessResponse(Guid ShopId, string ShopName, string Role, bool IsHome);

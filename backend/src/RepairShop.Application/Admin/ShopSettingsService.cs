@@ -1,6 +1,7 @@
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using RepairShop.Application.Abstractions;
+using RepairShop.Application.Billing;
 using RepairShop.Application.Common;
 using RepairShop.Application.Contracts;
 using RepairShop.Domain.Auditing;
@@ -30,6 +31,7 @@ public sealed class ShopSettingsService
     private readonly IAppLinks _links;
     private readonly IUnitOfWork _uow;
     private readonly IDateTimeProvider _clock;
+    private readonly SubscriptionService _subscriptions;
 
     public ShopSettingsService(
         IShopRepository shops,
@@ -44,7 +46,8 @@ public sealed class ShopSettingsService
         IFileUrlSigner fileUrls,
         IAppLinks links,
         IUnitOfWork uow,
-        IDateTimeProvider clock)
+        IDateTimeProvider clock,
+        SubscriptionService subscriptions)
     {
         _shops = shops;
         _integrations = integrations;
@@ -59,6 +62,7 @@ public sealed class ShopSettingsService
         _links = links;
         _uow = uow;
         _clock = clock;
+        _subscriptions = subscriptions;
     }
 
     public async Task<ShopSettingsResponse> GetAsync(Guid shopId, CancellationToken ct)
@@ -177,6 +181,7 @@ public sealed class ShopSettingsService
     {
         var now = _clock.UtcNow;
         var current = await GetShopAsync(currentShopId, ct);
+        await _subscriptions.EnsureBranchCapacityAsync(current.OrganizationId, ct);
 
         var branch = new Shop(current.OrganizationId, req.Name, req.Phone, req.AddressLine, req.City, current.Country, now);
         branch.UpdateBusiness(current.LegalName, current.TaxId, current.TaxCondition, current.Email, now);
@@ -223,6 +228,7 @@ public sealed class ShopSettingsService
         var branch = await GetShopAsync(branchId, ct);
         if (branch.OrganizationId != current.OrganizationId) throw new ForbiddenException("La sucursal pertenece a otra organización.");
         if (branch.Id == currentShopId && !isActive) throw new DomainException("No podés desactivar la sucursal en la que estás trabajando.");
+        if (isActive && !branch.IsActive) await _subscriptions.EnsureBranchCapacityAsync(current.OrganizationId, ct);
         branch.SetActive(isActive, _clock.UtcNow);
         await AuditAsync(currentShopId, isActive ? "branch_activated" : "branch_deactivated", actor, new { branchId }, ct);
         await _uow.SaveChangesAsync(ct);

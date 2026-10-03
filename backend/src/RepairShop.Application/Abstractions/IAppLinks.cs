@@ -8,6 +8,10 @@ public interface IAppLinks
     string Invitation(string token);
     string PasswordReset(string token);
     string Order(Guid orderId);
+    string VerifyEmail(string token);
+
+    /// <summary>Subscription page of the web app (return URL after paying).</summary>
+    string Billing();
 
     /// <summary>Public base URL of the API (used for webhooks such as Mercado Pago notifications).</summary>
     string ApiBase { get; }

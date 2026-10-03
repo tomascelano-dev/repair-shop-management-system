@@ -49,6 +49,8 @@ public static class TestDatabase
 /// <summary>The API running in memory against a fresh database (migrated and seeded with the dev users).</summary>
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
+    public const string PaddleWebhookSecret = "pdl_ntfset_integration_tests";
+
     public string ConnectionString { get; }
 
     public ApiFactory()
@@ -69,6 +71,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             ["RateLimiting__PublicPerMinute"] = "100000",
             ["App__PublicApiUrl"] = "http://localhost",
             ["App__FrontendBaseUrl"] = "http://localhost:5173",
+            // Paddle "configured" so its webhooks are accepted (tests never call its API); Mercado Pago is not,
+            // so checkouts from Argentina fall back to the simulated provider.
+            ["Billing__AllowSimulated"] = "true",
+            ["Billing__Paddle__ApiKey"] = "pdl_test_key",
+            ["Billing__Paddle__ClientToken"] = "test_client_token",
+            ["Billing__Paddle__WebhookSecret"] = PaddleWebhookSecret,
+            ["Billing__Paddle__PriceIds__Basic"] = "pri_basic",
+            ["Billing__Paddle__PriceIds__Standard"] = "pri_standard",
+            ["Billing__Paddle__PriceIds__Pro"] = "pri_pro",
         };
         foreach (var (key, value) in settings) Environment.SetEnvironmentVariable(key, value);
     }
@@ -116,6 +127,27 @@ public sealed class ApiClient
         var data = await res.DataAsync();
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", data.Str("accessToken"));
         return new ApiClient(http);
+    }
+
+    /// <summary>Signs up a brand-new shop from the website and returns a client logged in as its owner.</summary>
+    public static async Task<(ApiClient Client, JsonElement Login)> SignupAsync(ApiFactory factory, string country = "AR", string? email = null)
+    {
+        var http = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true, BaseAddress = new Uri("http://localhost") });
+        http.DefaultRequestHeaders.Add("X-RS-Refresh", "1");
+        email ??= $"owner{Guid.NewGuid():N}"[..20] + "@example.com";
+        var res = await http.PostAsJsonAsync("/api/v1/auth/signup", new
+        {
+            shopName = "Taller " + Guid.NewGuid().ToString("N")[..6],
+            ownerName = "Dueña Test",
+            email,
+            password = "Clave12345",
+            country,
+            timeZone = "America/Mexico_City",
+            acceptTerms = true
+        });
+        var data = await res.DataAsync();
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", data.Str("accessToken"));
+        return (new ApiClient(http), data);
     }
 
     public void UseToken(string token) => Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

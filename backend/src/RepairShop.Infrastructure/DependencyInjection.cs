@@ -8,7 +8,9 @@ using Microsoft.Extensions.Options;
 using RepairShop.Application.Abstractions;
 using RepairShop.Application.Customers;
 using RepairShop.Application.Security;
+using RepairShop.Application.Billing;
 using RepairShop.Infrastructure.Ai;
+using RepairShop.Infrastructure.Billing;
 using RepairShop.Infrastructure.Documents;
 using RepairShop.Infrastructure.Files;
 using RepairShop.Infrastructure.Idempotency;
@@ -54,6 +56,7 @@ public static class DependencyInjection
         AddQueries(services);
         AddFiles(services, config);
         AddIntegrations(services, config);
+        AddBilling(services, config);
         AddNotifications(services, config);
         AddAi(services, config);
 
@@ -82,6 +85,8 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IStoredFileRepository, StoredFileRepository>();
         services.AddScoped<IExchangeRateRepository, ExchangeRateRepository>();
+        services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+        services.AddScoped<IShopProvisioner, ShopProvisioner>();
 
         // CRM
         services.AddScoped<ICustomerRepository, CustomerRepository>();
@@ -167,6 +172,26 @@ public static class DependencyInjection
             services.AddSingleton<IExchangeRateProvider, NoExchangeRateProvider>();
         else
             services.AddSingleton<IExchangeRateProvider, DolarApiExchangeRateProvider>();
+    }
+
+    private static void AddBilling(IServiceCollection services, IConfiguration config)
+    {
+        services.Configure<BillingOptions>(config.GetSection(BillingOptions.SectionName));
+        var userAgent = new ProductInfoHeaderValue("RepairShop", "1.0");
+
+        services.AddHttpClient(MercadoPagoSubscriptionGateway.HttpClientName, c =>
+        {
+            c.BaseAddress = new Uri(config["Integrations:MercadoPago:BaseUrl"] ?? "https://api.mercadopago.com/");
+            c.Timeout = TimeSpan.FromSeconds(20);
+            c.DefaultRequestHeaders.UserAgent.Add(userAgent);
+        });
+        services.AddHttpClient(PaddleSubscriptionGateway.HttpClientName, c =>
+        {
+            c.Timeout = TimeSpan.FromSeconds(20);
+            c.DefaultRequestHeaders.UserAgent.Add(userAgent);
+        });
+        services.AddSingleton<ISubscriptionGateway, MercadoPagoSubscriptionGateway>();
+        services.AddSingleton<ISubscriptionGateway, PaddleSubscriptionGateway>();
     }
 
     private static void AddNotifications(IServiceCollection services, IConfiguration config)

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using RepairShop.Application.Abstractions;
 using RepairShop.Application.Admin;
+using RepairShop.Application.Billing;
 using RepairShop.Application.Cash;
 using RepairShop.Application.Currency;
 using RepairShop.Application.Customers;
@@ -32,6 +33,8 @@ public static class DependencyInjection
         services.AddScoped<AuthService>();
         services.AddScoped<UserAdminService>();
         services.AddScoped<ShopSettingsService>();
+        services.AddScoped<SubscriptionService>();
+        services.AddScoped<SignupService>();
 
         services.AddScoped<CustomerService>();
         services.AddScoped<DeviceService>();

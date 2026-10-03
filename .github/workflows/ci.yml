@@ -135,9 +135,14 @@ jobs:
           Notifications__WhatsApp__Provider: Simulated
           Notifications__Email__Provider: Simulated
           Jobs__Enabled: "false"
+          # Plans are activated without charging (no payment provider in CI).
+          Billing__AllowSimulated: "true"
         run: |
           dotnet build src/RepairShop.Api/RepairShop.Api.csproj -c Release
-          nohup dotnet src/RepairShop.Api/bin/Release/net8.0/RepairShop.Api.dll > "$RUNNER_TEMP/api.log" 2>&1 &
+          # Run from the output folder: the content root is the working directory, and appsettings.json
+          # (JWT issuer and audience among others) is read from there.
+          cd src/RepairShop.Api/bin/Release/net8.0
+          nohup dotnet RepairShop.Api.dll > "$RUNNER_TEMP/api.log" 2>&1 &
           for i in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:8080/healthz > /dev/null; then echo "API is up"; exit 0; fi
             sleep 2

@@ -51,6 +51,12 @@ public sealed class ProblemDetailsMiddleware : IMiddleware
             problem.Extensions["traceId"] = context.TraceIdentifier;
             if (!string.IsNullOrWhiteSpace(correlationId)) problem.Extensions["correlationId"] = correlationId;
 
+            if (ex is PaymentRequiredException pr)
+            {
+                problem.Extensions["code"] = pr.Code;
+                if (pr.Module is not null) problem.Extensions["module"] = pr.Module;
+            }
+
             if (ex is RetryAfterException ra)
             {
                 context.Response.Headers["Retry-After"] = ra.RetryAfterSeconds.ToString();
@@ -74,6 +80,7 @@ public sealed class ProblemDetailsMiddleware : IMiddleware
         ConflictException => (StatusCodes.Status409Conflict, "Conflicto", true),
         LockedException => (StatusCodes.Status423Locked, "Bloqueado", true),
         TooManyRequestsException => (StatusCodes.Status429TooManyRequests, "Demasiados intentos", true),
+        PaymentRequiredException => (StatusCodes.Status402PaymentRequired, "Plan o suscripción", true),
         _ => (StatusCodes.Status500InternalServerError, "Error inesperado", false)
     };
 }

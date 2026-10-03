@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using RepairShop.Application.Abstractions;
 using RepairShop.Application.Security;
+using RepairShop.Domain.Billing;
 using RepairShop.Domain.Customers;
 using RepairShop.Domain.Devices;
 using RepairShop.Domain.Inventory;
@@ -72,6 +73,7 @@ public static class DbSeeder
 
         foreach (var shopId in await db.Shops.Select(s => s.Id).ToListAsync(ct))
             await SeedTemplatesAsync(db, shopId, now, ct);
+        await EnsureSubscriptionsAsync(db, now, ct);
         await db.SaveChangesAsync(ct);
         return shop;
     }
@@ -283,7 +285,23 @@ public static class DbSeeder
             """),
     };
 
-    private static async Task SeedTemplatesAsync(RepairShopDbContext db, Guid shopId, DateTime now, CancellationToken ct)
+    /// <summary>
+    /// Organizations created by the platform owner (seed, `admin create`) get a complimentary Pro plan.
+    /// Self-service signups always create their own trial, so they never reach this.
+    /// </summary>
+    private static async Task EnsureSubscriptionsAsync(RepairShopDbContext db, DateTime now, CancellationToken ct)
+    {
+        var withSubscription = await db.Subscriptions.Select(x => x.OrganizationId).ToListAsync(ct);
+        var missing = await db.Shops
+            .Where(s => !withSubscription.Contains(s.OrganizationId))
+            .GroupBy(s => s.OrganizationId)
+            .Select(g => g.Key)
+            .ToListAsync(ct);
+        foreach (var orgId in missing)
+            await db.Subscriptions.AddAsync(Subscription.Complimentary(orgId, PlanId.Pro, "AR", now), ct);
+    }
+
+    internal static async Task SeedTemplatesAsync(RepairShopDbContext db, Guid shopId, DateTime now, CancellationToken ct)
     {
         var keys = DefaultTemplates.Select(x => x.Key).ToArray();
         var existing = (await db.MessageTemplates.IgnoreQueryFilters()

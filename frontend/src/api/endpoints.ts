@@ -15,6 +15,18 @@ export const authApi = {
   resetPassword: (token: string, newPassword: string) => post<void>('/auth/reset-password', { token, newPassword }),
   acceptInvitation: (token: string, password: string, displayName?: string) =>
     post<T.LoginResponse>('/auth/accept-invitation', { token, password, displayName }, { headers: authHeaders }),
+  signup: (body: T.SignupInput) => post<T.LoginResponse>('/auth/signup', body, { headers: authHeaders }),
+  verifyEmail: (token: string) => post<void>('/auth/verify-email', { token }),
+  resendVerification: () => post<void>('/auth/resend-verification'),
+}
+
+// ===== Billing (plans and the shop's subscription) =====
+export const billingApi = {
+  plans: (country?: string) => get<T.PlansResponse>('/billing/plans', { country }),
+  config: () => get<T.BillingConfig>('/billing/config'),
+  subscription: () => get<T.Subscription>('/billing/subscription'),
+  checkout: (plan: T.PlanId) => post<T.CheckoutResult>('/billing/checkout', { plan }),
+  cancel: () => post<T.Subscription>('/billing/cancel'),
 }
 
 // ===== Users / settings =====

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using RepairShop.Application.Abstractions;
 using RepairShop.Domain.Auditing;
+using RepairShop.Domain.Billing;
 using RepairShop.Domain.Cash;
 using RepairShop.Domain.Common;
 using RepairShop.Domain.Currency;
@@ -54,6 +55,7 @@ public sealed class RepairShopDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+    public DbSet<Subscription> Subscriptions => Set<Subscription>();
 
     // CRM
     public DbSet<Customer> Customers => Set<Customer>();

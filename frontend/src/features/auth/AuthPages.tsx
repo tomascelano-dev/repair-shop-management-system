@@ -7,7 +7,7 @@ import { errorMessage } from '../../api/http'
 import { useSession } from '../../auth/session'
 import { Alert, Button, Field, Input, Loading } from '../../components/ui'
 
-function AuthCard({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
+export function AuthCard({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
     <div className="flex min-h-full items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 px-4 py-10">
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
@@ -73,6 +73,12 @@ export function LoginPage() {
         <p className="text-center text-sm">
           <Link to="/olvide" className="text-brand-700 hover:underline">
             Olvidé mi contraseña
+          </Link>
+        </p>
+        <p className="border-t border-slate-100 pt-4 text-center text-sm text-slate-600">
+          ¿Todavía no usás RepairShop?{' '}
+          <Link to="/registro" className="font-medium text-brand-700 hover:underline">
+            Probalo gratis
           </Link>
         </p>
       </form>

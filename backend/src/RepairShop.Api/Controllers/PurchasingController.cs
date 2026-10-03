@@ -1,15 +1,18 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RepairShop.Api.Billing;
 using RepairShop.Api.Common;
 using RepairShop.Api.Security;
 using RepairShop.Application.Contracts;
 using RepairShop.Application.Inventory;
+using RepairShop.Domain.Billing;
 using RepairShop.Domain.Inventory;
 
 namespace RepairShop.Api.Controllers;
 
 [ApiController]
 [Route("api/v1")]
+[RequiresModule(PlanModules.Purchasing)]
 [Authorize(Policy = Policies.InventoryManage)]
 public sealed class PurchasingController : ControllerBase
 {

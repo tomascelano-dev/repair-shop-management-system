@@ -18,6 +18,9 @@ export interface ProblemDetails {
   traceId?: string
   correlationId?: string
   retryAfterSeconds?: number
+  /** 402 answers: 'subscription_inactive' or 'plan_upgrade_required' (+ module). */
+  code?: string
+  module?: string
 }
 
 export interface Page<T> {
@@ -53,6 +56,7 @@ export interface UserResponse {
   role: Role
   shopName?: string | null
   organizationId?: Guid | null
+  emailVerified?: boolean
 }
 
 export interface ShopAccess {
@@ -1142,4 +1146,71 @@ export interface PublicTracking {
   warranty?: { days: number; expiresAtUtc?: IsoDate | null; active: boolean } | null
   canLeaveFeedback: boolean
   feedbackSubmitted: boolean
+}
+
+// ===== Billing (SaaS subscription) =====
+
+export type PlanId = 'Basic' | 'Standard' | 'Pro'
+export type SubscriptionStatus = 'Trialing' | 'Active' | 'PastDue' | 'Canceled' | 'Expired'
+export type BillingProvider = 'None' | 'Manual' | 'MercadoPago' | 'Paddle' | 'Simulated'
+
+export interface Plan {
+  id: PlanId
+  name: string
+  maxBranches: number
+  modules: string[]
+  price: number | null
+  currency: string
+}
+
+export interface PlansResponse {
+  country: string
+  currency: string
+  trialDays: number
+  plans: Plan[]
+}
+
+export interface BillingConfig {
+  signupEnabled: boolean
+  trialDays: number
+  paddleClientToken: string | null
+  paddleEnvironment: 'sandbox' | 'production'
+}
+
+export interface Subscription {
+  plan: PlanId
+  planName: string
+  status: SubscriptionStatus
+  provider: BillingProvider
+  billingCountry: string
+  hasFullAccess: boolean
+  trialEndsAtUtc: IsoDate
+  trialDaysLeft: number
+  currentPeriodEndsAtUtc: IsoDate | null
+  canceledAtUtc: IsoDate | null
+  amount: number | null
+  currency: string | null
+  pendingPlan: PlanId | null
+  modules: string[]
+  maxBranches: number
+  branchesUsed: number
+  canManageAtProvider: boolean
+  checkoutAvailable: boolean
+  emailVerified: boolean
+  plans: Plan[]
+}
+
+export interface CheckoutResult {
+  url: string | null
+  changed: boolean
+}
+
+export interface SignupInput {
+  shopName: string
+  ownerName: string
+  email: string
+  password: string
+  country: string
+  timeZone?: string
+  acceptTerms: boolean
 }

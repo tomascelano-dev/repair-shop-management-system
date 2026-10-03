@@ -26,6 +26,10 @@ public sealed class AppUser
     public UserTokenPurpose? PendingTokenPurpose { get; private set; }
     public DateTime? PendingTokenExpiresAtUtc { get; private set; }
 
+    // Self-service signups prove their email with a link; invited users prove it by accepting the invitation.
+    public DateTime? EmailVerifiedAtUtc { get; private set; }
+    public string? EmailVerificationTokenHash { get; private set; }
+
     public DateTime? LastLoginAtUtc { get; private set; }
     public DateTime CreatedAtUtc { get; private set; }
     public DateTime UpdatedAtUtc { get; private set; }
@@ -105,6 +109,31 @@ public sealed class AppUser
            && PendingTokenExpiresAtUtc > nowUtc;
 
     public void RegisterLogin(DateTime nowUtc) => LastLoginAtUtc = nowUtc;
+
+    public bool IsEmailVerified => EmailVerifiedAtUtc is not null;
+
+    public void RequestEmailVerification(string tokenHash, DateTime nowUtc)
+    {
+        if (IsEmailVerified) return;
+        EmailVerificationTokenHash = string.IsNullOrWhiteSpace(tokenHash) ? throw new DomainException("El token de verificación es inválido.") : tokenHash;
+        UpdatedAtUtc = nowUtc;
+    }
+
+    public bool VerifyEmail(string tokenHash, DateTime nowUtc)
+    {
+        if (IsEmailVerified) return true;
+        if (EmailVerificationTokenHash is null || !string.Equals(EmailVerificationTokenHash, tokenHash, StringComparison.Ordinal)) return false;
+        MarkEmailVerified(nowUtc);
+        return true;
+    }
+
+    public void MarkEmailVerified(DateTime nowUtc)
+    {
+        if (IsEmailVerified) return;
+        EmailVerifiedAtUtc = nowUtc;
+        EmailVerificationTokenHash = null;
+        UpdatedAtUtc = nowUtc;
+    }
 
     public void RotateSecurityStamp(DateTime nowUtc)
     {

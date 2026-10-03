@@ -77,6 +77,8 @@ internal sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
         b.Property(x => x.SecurityStamp).HasMaxLength(64).IsRequired();
         b.Property(x => x.PendingTokenHash).HasMaxLength(128);
         b.HasIndex(x => x.PendingTokenHash);
+        b.Property(x => x.EmailVerificationTokenHash).HasMaxLength(128);
+        b.HasIndex(x => x.EmailVerificationTokenHash);
 
         b.Property(x => x.CreatedAtUtc).IsRequired();
         b.Property(x => x.UpdatedAtUtc).IsRequired();

@@ -7,6 +7,7 @@ public interface IUserRepository
     Task<AppUser?> GetByEmailAsync(string email, CancellationToken ct);
     Task<AppUser?> GetByIdAsync(Guid id, CancellationToken ct);
     Task<AppUser?> GetByPendingTokenHashAsync(string tokenHash, CancellationToken ct);
+    Task<AppUser?> GetByEmailVerificationTokenHashAsync(string tokenHash, CancellationToken ct);
     Task<List<AppUser>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
 
     /// <summary>Users whose home shop is the shop or that were granted access to it.</summary>

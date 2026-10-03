@@ -30,6 +30,12 @@ const MessagesPage = page(() => import('./features/messages/MessagesPage'), 'Mes
 const SettingsPage = page(() => import('./features/settings/SettingsPage'), 'SettingsPage')
 const ProfilePage = page(() => import('./features/auth/ProfilePage'), 'ProfilePage')
 const TrackingPage = page(() => import('./features/portal/TrackingPage'), 'TrackingPage')
+const BillingPage = page(() => import('./features/billing/BillingPage'), 'BillingPage')
+const SignupPage = page(() => import('./features/public/SignupPage'), 'SignupPage')
+const VerifyEmailPage = page(() => import('./features/public/SignupPage'), 'VerifyEmailPage')
+const PricingPage = page(() => import('./features/public/PricingPage'), 'PricingPage')
+const TermsPage = page(() => import('./features/public/LegalPages'), 'TermsPage')
+const PrivacyPage = page(() => import('./features/public/LegalPages'), 'PrivacyPage')
 
 function Guard({ permission, children }: { permission: Permission; children: ReactNode }) {
   return <RequirePermission permission={permission}>{children}</RequirePermission>
@@ -44,6 +50,11 @@ export default function App() {
         <Route path="/restablecer" element={<ResetPasswordPage />} />
         <Route path="/invitacion" element={<AcceptInvitationPage />} />
         <Route path="/t/:token" element={<TrackingPage />} />
+        <Route path="/registro" element={<SignupPage />} />
+        <Route path="/verificar-email" element={<VerifyEmailPage />} />
+        <Route path="/precios" element={<PricingPage />} />
+        <Route path="/terminos" element={<TermsPage />} />
+        <Route path="/privacidad" element={<PrivacyPage />} />
 
         <Route
           element={
@@ -69,6 +80,7 @@ export default function App() {
           <Route path="reports" element={<Guard permission="reports"><ReportsPage /></Guard>} />
           <Route path="messages" element={<Guard permission="orders.work"><MessagesPage /></Guard>} />
           <Route path="settings" element={<Guard permission="admin"><SettingsPage /></Guard>} />
+          <Route path="billing" element={<Guard permission="admin"><BillingPage /></Guard>} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="*" element={<NotFound />} />
         </Route>

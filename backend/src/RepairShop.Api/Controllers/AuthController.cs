@@ -2,8 +2,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Caching.Memory;
+using RepairShop.Api.Billing;
 using RepairShop.Api.Common;
 using RepairShop.Api.Security;
+using RepairShop.Application.Billing;
 using RepairShop.Application.Common;
 using RepairShop.Application.Contracts;
 using RepairShop.Application.Security;
@@ -16,6 +18,7 @@ namespace RepairShop.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/v1/auth")]
+[SkipSubscriptionGate]
 public sealed class AuthController : ControllerBase
 {
     private readonly AuthService _auth;
@@ -126,6 +129,33 @@ public sealed class AuthController : ControllerBase
     {
         await _auth.ResetPasswordAsync(body, ct);
         return NoContent();
+    }
+
+    /// <summary>Self-service signup: creates the shop with a free trial and signs the owner in.</summary>
+    [HttpPost("signup")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimits.Auth)]
+    public async Task<ActionResult<ApiResponse<LoginResponse>>> Signup([FromServices] SignupService signup, [FromBody] SignupRequest body, CancellationToken ct)
+    {
+        var result = await signup.SignupAsync(body, HttpContext.ClientIp(), HttpContext.UserAgent(), ct);
+        return Ok(Issue(result));
+    }
+
+    [HttpPost("verify-email")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimits.Auth)]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest body, CancellationToken ct)
+    {
+        await _auth.VerifyEmailAsync(body.Token, ct);
+        return NoContent();
+    }
+
+    [HttpPost("resend-verification")]
+    [EnableRateLimiting(RateLimits.Auth)]
+    public async Task<IActionResult> ResendVerification(CancellationToken ct)
+    {
+        await _auth.ResendEmailVerificationAsync(CurrentUser.GetUserId(User), ct);
+        return Accepted();
     }
 
     [HttpPost("accept-invitation")]

@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RepairShop.Api.Billing;
 using RepairShop.Api.Common;
 using RepairShop.Api.Security;
 using RepairShop.Application.Contracts;
 using RepairShop.Application.Inventory;
+using RepairShop.Domain.Billing;
 using RepairShop.Domain.Inventory;
 
 namespace RepairShop.Api.Controllers;
@@ -11,6 +13,7 @@ namespace RepairShop.Api.Controllers;
 /// <summary>Stock transfers between branches of the same organization (send → receive).</summary>
 [ApiController]
 [Route("api/v1/transfers")]
+[RequiresModule(PlanModules.Transfers)]
 [Authorize(Policy = Policies.InventoryManage)]
 public sealed class TransfersController : ControllerBase
 {
