@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 // Override the backend target with VITE_PROXY_TARGET.
 const target = process.env.VITE_PROXY_TARGET || 'http://localhost:8080'
 
-export default defineConfig({
+export default defineConfig(({ isSsrBuild }) => ({
   plugins: [react()],
   server: {
     proxy: {
@@ -19,12 +19,15 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 700,
     rollupOptions: {
-      output: {
-        manualChunks: {
-          react: ['react', 'react-dom', 'react-router-dom'],
-          query: ['@tanstack/react-query', 'axios'],
-        },
-      },
+      // The SSR build (scripts/prerender.mjs) is a single module run by Node: no vendor chunks there.
+      output: isSsrBuild
+        ? {}
+        : {
+            manualChunks: {
+              react: ['react', 'react-dom', 'react-router-dom'],
+              query: ['@tanstack/react-query', 'axios'],
+            },
+          },
     },
   },
   test: {
@@ -34,4 +37,4 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     css: false,
   },
-})
+}))

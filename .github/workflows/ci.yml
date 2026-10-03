@@ -93,6 +93,18 @@ jobs:
         run: docker compose -f compose.yml config --quiet
       - name: Validate the Caddyfile
         run: docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      - name: Public pages have content without JavaScript
+        # Payment-provider reviewers and crawlers read the HTML as served; the SPA shell alone is empty.
+        run: |
+          docker run -d --name web -p 8099:80 repairshop-web:ci
+          for i in $(seq 1 20); do curl -fsS -o /dev/null http://127.0.0.1:8099/precios && break; sleep 1; done
+          check() { curl -fsS "http://127.0.0.1:8099$1" | grep -q "$2" || { echo "$1 does not contain: $2"; exit 1; }; }
+          check /precios 'Profesional'
+          check /terminos 'Términos del servicio'
+          check /privacidad 'Política de privacidad'
+          check /reembolsos 'Política de reembolsos'
+          check / 'href="/reembolsos"'
+          check /orders 'id="root" class="h-full"></div>'
 
   e2e:
     name: End-to-end (Playwright)
