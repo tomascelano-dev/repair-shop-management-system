@@ -27,7 +27,7 @@ function Contact() {
 
 function Seller() {
   const name = useLegalConfig()?.legalName
-  return name ? <> El servicio lo presta {name}.</> : null
+  return name ? <>{` El servicio lo presta ${name}.`}</> : null
 }
 
 function RefundLink() {

@@ -134,7 +134,7 @@ Cualquier taller puede crear su cuenta en `/registro` y usar todo gratis durante
   4. Developer tools → Authentication: una *API key* (`PADDLE_API_KEY`) y un *client-side token* (`PADDLE_CLIENT_TOKEN`).
   5. Developer tools → Notifications: destino `https://app.techxto.ar/api/v1/billing/webhooks/paddle` con los eventos `subscription.*`. Copiá la *secret key* a `PADDLE_WEBHOOK_SECRET`.
   6. Cuando pruebes un pago en sandbox y veas el plan activo, cambiá a las credenciales de producción y `PADDLE_ENVIRONMENT=production`.
-- Antes de pedir la aprobación de Paddle, completá `CONTACT_EMAIL` (email de soporte) y `LEGAL_NAME` (tu nombre o el de tu empresa): aparecen en Términos, Privacidad y en la política de reembolsos (`/reembolsos`), que Paddle revisa.
+- Antes de pedir la aprobación de Paddle, completá `CONTACT_EMAIL` (email de soporte) y `LEGAL_NAME` (tu nombre o el de tu empresa): aparecen en Términos, Privacidad y en la política de reembolsos (`/reembolsos`), que Paddle revisa. Después de cambiarlos, `docker compose up -d` (los usan la API y el contenedor `web`).
 - Con un medio de cobro listo, abrí el alta: `SIGNUP_ENABLED=true` y `docker compose up -d`.
 
 Los talleres que ya existían antes de esta versión tienen el plan Profesional bonificado. Para bonificar otro:

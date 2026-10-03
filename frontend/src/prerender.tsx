@@ -5,7 +5,7 @@ import type { ReactElement } from 'react'
 import { renderToString } from 'react-dom/server'
 import { StaticRouter } from 'react-router-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import type { PlansResponse } from './api/types'
+import type { BillingConfig, PlansResponse } from './api/types'
 import { PricingPage } from './features/public/PricingPage'
 import { PrivacyPage, RefundPage, TermsPage } from './features/public/LegalPages'
 
@@ -66,9 +66,24 @@ export const PUBLIC_PAGES: PublicPage[] = [
   },
 ]
 
+/**
+ * The contact email and seller name come from the server's environment, not from the build: the pages are rendered
+ * with these markers and scripts/prerender.mjs turns them into Caddy template expressions filled in when served.
+ */
+export const CONTACT_MARKER = '__RS_CONTACT_EMAIL__'
+export const SELLER_MARKER = '__RS_LEGAL_NAME__'
+
 export function render(page: PublicPage): string {
   const client = new QueryClient()
   client.setQueryData(['plans', 'US'], PLANS)
+  client.setQueryData(['billing-config'], {
+    signupEnabled: true,
+    trialDays: PLANS.trialDays,
+    paddleClientToken: null,
+    paddleEnvironment: 'production',
+    contactEmail: CONTACT_MARKER,
+    legalName: SELLER_MARKER,
+  } satisfies BillingConfig)
   return renderToString(
     <QueryClientProvider client={client}>
       <StaticRouter location={page.path}>{page.element()}</StaticRouter>

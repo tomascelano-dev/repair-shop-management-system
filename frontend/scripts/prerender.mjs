@@ -7,13 +7,28 @@ const SHELL_ROOT = '<div id="root" class="h-full"></div>'
 const escape = (s) => s.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;')
 
 await build({ logLevel: 'warn', build: { ssr: 'src/prerender.tsx', outDir: 'dist-ssr', emptyOutDir: true } })
-const { PUBLIC_PAGES, render } = await import(new URL('../dist-ssr/prerender.js', import.meta.url).href)
+const { PUBLIC_PAGES, render, CONTACT_MARKER, SELLER_MARKER } = await import(new URL('../dist-ssr/prerender.js', import.meta.url).href)
+
+// The web server (Caddy `templates`, delimiters [[ ]]) fills in CONTACT_EMAIL and LEGAL_NAME from its environment
+// on every request, falling back to the same text the app shows when they are not set.
+const contactLink = new RegExp(`<a href="mailto:${CONTACT_MARKER}"([^>]*)>${CONTACT_MARKER}</a>`, 'g')
+const contactTemplate =
+  `[[with env "CONTACT_EMAIL"]]<a href="mailto:[[html .]]"$1>[[html .]]</a>` +
+  `[[else]]<a href="https://techxto.ar" target="_blank" rel="noreferrer"$1>los canales publicados en techxto.ar</a>[[end]]`
+const sellerText = ` El servicio lo presta ${SELLER_MARKER}.`
+const sellerTemplate = `[[with env "LEGAL_NAME"]] El servicio lo presta [[html .]].[[end]]`
+
+function fillServerSide(markup) {
+  const out = markup.replace(contactLink, contactTemplate).replaceAll(sellerText, sellerTemplate)
+  if (out.includes(CONTACT_MARKER) || out.includes(SELLER_MARKER)) throw new Error('a contact or seller marker was left in the page')
+  return out
+}
 
 const shell = await readFile('dist/index.html', 'utf8')
 if (!shell.includes(SHELL_ROOT)) throw new Error(`dist/index.html has no ${SHELL_ROOT}`)
 
 for (const page of PUBLIC_PAGES) {
-  const markup = render(page)
+  const markup = fillServerSide(render(page))
   if (!markup.includes(page.expect)) throw new Error(`${page.path}: the pre-rendered page does not contain "${page.expect}"`)
   const html = shell
     .replace(SHELL_ROOT, `<div id="root" class="h-full">${markup}</div>`)
