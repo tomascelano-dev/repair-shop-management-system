@@ -2,6 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Minimal globals */
-html, body { height: 100%; }
-body { @apply bg-slate-50 text-slate-900; }
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* Dialog animation */
+dialog[open] {
+  animation: dialog-in 120ms ease-out;
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Print: hide app chrome, keep the content */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+}
+
+/* Tabular numbers for amounts */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

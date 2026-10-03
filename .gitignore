@@ -39,3 +39,8 @@ Thumbs.db
 
 # Uploaded files (local storage)
 **/data/uploads/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/

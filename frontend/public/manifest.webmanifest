@@ -1,0 +1,21 @@
+{
+  "name": "RepairShop · Gestión de taller",
+  "short_name": "RepairShop",
+  "description": "Órdenes de reparación, clientes, stock, punto de venta y caja.",
+  "lang": "es-AR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f8fafc",
+  "theme_color": "#2547ea",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Nueva orden", "url": "/orders/new" },
+    { "name": "Punto de venta", "url": "/pos" },
+    { "name": "Tablero", "url": "/orders/board" }
+  ]
+}
