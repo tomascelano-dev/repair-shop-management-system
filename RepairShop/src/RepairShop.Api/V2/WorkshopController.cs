@@ -23,7 +23,7 @@ public sealed record IntakeRequest(Guid? CustomerId, Guid? DeviceId,
     [StringLength(80)] string? Identifier,
     [Required, StringLength(500, MinimumLength=5)] string Issue,
     [StringLength(500)] string Condition, [StringLength(200)] string Accessories,
-    string Priority, Dictionary<string,string>? Checks);
+    string Priority, Dictionary<string,string>? Checks, [StringLength(160)] string? Email = null);
 public sealed record EditWorkflow(int Version, [StringLength(1200)] string Diagnosis, Dictionary<string,string> QualityChecks, decimal LaborCost);
 public sealed record PublishQuote(int Version, List<QuoteItem> Lines, string Currency, [StringLength(2000)] string Terms, int ValidDays, int WarrantyDays);
 public sealed record ChangeStage(int Version, string Status, [StringLength(300)] string? Reason);
@@ -31,11 +31,11 @@ public sealed record PaymentRequest(int Version, decimal Amount, string Currency
 public sealed record RefundRequest(int Version, Guid PaymentId, decimal Amount, [Required, StringLength(300,MinimumLength=3)] string Reason);
 public sealed record HandoverRequest(int Version, [Required, StringLength(120,MinimumLength=3)] string Recipient, [StringLength(300)] string? DebtReason);
 public sealed record PortalRequest(int Version);
-public sealed record DecideRequest(Guid QuoteId, bool Accept, [Required, StringLength(120,MinimumLength=3)] string Name);
+public sealed record DecideRequest(Guid QuoteId, bool Accept, [Required, StringLength(120,MinimumLength=3)] string Name, string? Signature = null);
 public sealed record PhotoRequest(int Version, string DataUrl);
 
 [ApiController, Authorize, Route("api/v2")]
-public sealed class WorkshopController(RepairShopDbContext db, IWebHostEnvironment env) : ControllerBase
+public sealed class WorkshopController(RepairShopDbContext db, IWebHostEnvironment env, RepairShop.Api.Saas.SaasEvents events) : ControllerBase
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly string[] Tests = ["Pantalla y táctil", "Cámaras", "Audio y micrófono", "Carga", "Botones", "Biometría"];
@@ -69,7 +69,9 @@ public sealed class WorkshopController(RepairShopDbContext db, IWebHostEnvironme
     {
         var previous=o.Status; o.MoveTo(target,DateTime.UtcNow);
         db.RepairOrderStatusHistory.Add(new RepairOrderStatusHistory(o.ShopId,o.Id,previous,target,CurrentUser.GetUserId(User),DateTime.UtcNow));
+        pendingStatus.Add((o.ShopId,o.Id,previous,target));
     }
+    private readonly List<(Guid Shop,Guid Order,RepairOrderStatus From,RepairOrderStatus To)> pendingStatus=[];
     private async Task<IActionResult> Mutate(Guid shop, string operation, object body, Func<Task<object>> action)
     {
         var key = Request.Headers["Idempotency-Key"].ToString();
@@ -85,6 +87,8 @@ public sealed class WorkshopController(RepairShopDbContext db, IWebHostEnvironme
             return Ok(new { data=ReadJson(previous.ResponseJson) });
         }
         var result=await action();
+        foreach(var change in pendingStatus)await events.StatusChanged(change.Shop,change.Order,change.From,change.To);
+        pendingStatus.Clear();
         db.WorkflowRequests.Add(new WorkflowRequest{ShopId=shop,Operation=operation,Key=key,Hash=fingerprint,ResponseJson=JsonSerializer.Serialize(result,Json)});
         await db.SaveChangesAsync(); await tx.CommitAsync();
         return Ok(new { data=result });
@@ -122,21 +126,9 @@ public sealed class WorkshopController(RepairShopDbContext db, IWebHostEnvironme
 
     [HttpPost("intake")]
     public Task<IActionResult> Intake(IntakeRequest b) => Mutate(ShopId,"intake",b,async()=> {
-        var shop=ShopId; var now=DateTime.UtcNow;
-        var customer=b.CustomerId.HasValue ? await db.Customers.SingleOrDefaultAsync(x=>x.Id==b.CustomerId && x.ShopId==shop) : null;
-        if(b.CustomerId.HasValue && customer is null) throw new DomainException("Cliente no disponible en este taller.");
-        if(customer is null){customer=new Customer(shop,b.CustomerName,b.Phone,null,now);db.Customers.Add(customer);}
-        var device=b.DeviceId.HasValue ? await db.Devices.SingleOrDefaultAsync(x=>x.Id==b.DeviceId && x.ShopId==shop && x.CustomerId==customer.Id) : null;
-        if(b.DeviceId.HasValue && device is null) throw new DomainException("El equipo no pertenece al cliente seleccionado.");
-        if(device is null){device=new Device(shop,customer.Id,b.Brand,b.Model,null,b.Identifier,null,now);db.Devices.Add(device);}
-        var order=new RepairOrder(shop,customer.Id,device.Id,b.Issue,null,now);db.RepairOrders.Add(order);
-        var w=new WorkshopWorkflow {Id=order.Id,ShopId=shop,CustomerName=customer.FullName,CustomerPhone=customer.Phone,
-            DeviceLabel=$"{device.Brand} {device.Model}",Identifier=device.SerialNumber,Condition=b.Condition??"",Accessories=b.Accessories??"",
-            Priority=b.Priority=="Alta"?"Alta":"Normal",IntakeChecksJson=JsonSerializer.Serialize(ValidateChecks(b.Checks),Json)};
-        db.Workflows.Add(w);Note(order.Id,shop,"Equipo recibido y condición de ingreso registrada.");
-        var branch = await db.PremiumBranches.Where(x => x.ShopId == shop).OrderBy(x => x.CreatedAtUtc).FirstOrDefaultAsync();
-        if (branch is not null) db.OrderBusinesses.Add(new RepairShop.Domain.Premium.OrderBusiness { ShopId = shop, OrderId = order.Id, BranchId = branch.Id });
-        await db.SaveChangesAsync(); return new {id=order.Id,number=w.Number};
+        var created=await WorkshopIntake.Create(db,ShopId,CurrentUser.GetUserId(User),b);
+        await events.OrderReceived(ShopId,created.Id,b.Email??"");
+        return new {id=created.Id,number=created.Number};
     });
 
     [HttpPut("orders/{id:guid}/diagnosis")]
@@ -187,7 +179,8 @@ public sealed class WorkshopController(RepairShopDbContext db, IWebHostEnvironme
         var amount=decimal.Round(b.Amount,2,MidpointRounding.AwayFromZero);
         if(!Enum.IsDefined(b.Method)||amount<=0||amount>q.Total-await Paid(id,ShopId))throw new DomainException("El importe debe ser mayor a cero y no superar el saldo.");
         var payment=new RepairOrderPayment(ShopId,id,amount,b.Currency,b.Method,b.Reference,CurrentUser.GetUserId(User),DateTime.UtcNow);db.RepairOrderPayments.Add(payment);w.Version++;
-        Note(id,ShopId,$"Cobro registrado: {b.Currency} {amount:N2}.");return new{payment.Id,w.Version};
+        Note(id,ShopId,$"Cobro registrado: {b.Currency} {amount:N2}.");
+        await events.PaymentRegistered(ShopId,id,payment.Id,amount,b.Currency,b.Method,CurrentUser.GetUserId(User));return new{payment.Id,w.Version};
     });
 
     [HttpPost("orders/{id:guid}/refunds"),Authorize(Policy="AdminOnly")]
@@ -196,7 +189,8 @@ public sealed class WorkshopController(RepairShopDbContext db, IWebHostEnvironme
         var p=await db.RepairOrderPayments.SingleOrDefaultAsync(x=>x.Id==b.PaymentId&&x.RepairOrderId==id&&x.ShopId==ShopId);
         var amount=decimal.Round(b.Amount,2,MidpointRounding.AwayFromZero);
         if(p is null||amount<=0||amount>p.Amount-await db.WorkflowRefunds.Where(x=>x.PaymentId==p.Id).SumAsync(x=>x.Amount))throw new DomainException("La devolución supera el cobro disponible.");
-        db.WorkflowRefunds.Add(new WorkflowRefund{ShopId=ShopId,OrderId=id,PaymentId=p.Id,Amount=amount,Reason=b.Reason,CreatedAtUtc=DateTime.UtcNow});w.Version++;Note(id,ShopId,$"Devolución: {amount:N2}. {b.Reason}");return new{w.Version};
+        db.WorkflowRefunds.Add(new WorkflowRefund{ShopId=ShopId,OrderId=id,PaymentId=p.Id,Amount=amount,Reason=b.Reason,CreatedAtUtc=DateTime.UtcNow});w.Version++;
+        await events.RefundRegistered(ShopId,id,p.Id,amount,CurrentUser.GetUserId(User));Note(id,ShopId,$"Devolución: {amount:N2}. {b.Reason}");return new{w.Version};
     });
 
     [HttpPost("orders/{id:guid}/handover")]
@@ -209,7 +203,8 @@ public sealed class WorkshopController(RepairShopDbContext db, IWebHostEnvironme
         var due=q?.Status=="Accepted"?q.Total-paid:0;
         if(due>0 && (!User.IsInRole("Admin")||string.IsNullOrWhiteSpace(b.DebtReason)))throw new DomainException("Hay saldo pendiente. Un administrador debe justificar la entrega con deuda.");
         if(o.Status==RepairOrderStatus.Ready)Move(o,RepairOrderStatus.Delivered);
-        w.DeliveredTo=b.Recipient.Trim();w.HandedOverAtUtc=DateTime.UtcNow;w.Version++;Note(id,ShopId,$"Equipo retirado por {b.Recipient}. {b.DebtReason}");return new{w.Version};
+        w.DeliveredTo=b.Recipient.Trim();w.HandedOverAtUtc=DateTime.UtcNow;w.Version++;
+        if(o.Status==RepairOrderStatus.Delivered)await events.Delivered(ShopId,id);Note(id,ShopId,$"Equipo retirado por {b.Recipient}. {b.DebtReason}");return new{w.Version};
     });
 
     [HttpPost("orders/{id:guid}/portal")]
@@ -235,7 +230,8 @@ public sealed class WorkshopController(RepairShopDbContext db, IWebHostEnvironme
     {
         var w=await Grant();var o=await db.RepairOrders.SingleAsync(x=>x.Id==w.Id&&x.ShopId==w.ShopId);var q=await LatestQuote(w.Id,w.ShopId);
         var lines=q is null?[]:JsonSerializer.Deserialize<List<QuoteItem>>(q.LinesJson,Json)!;
-        return Ok(new{data=new{w.Number,w.CustomerName,w.DeviceLabel,Status=o.Status.ToString(),w.HandedOverAtUtc,ShopName=await db.Shops.Where(x=>x.Id==w.ShopId).Select(x=>x.Name).SingleAsync(),Paid=await Paid(w.Id,w.ShopId),
+        return Ok(new{data=new{w.Number,w.CustomerName,w.DeviceLabel,Status=o.Status.ToString(),w.HandedOverAtUtc,ShopName=await db.Shops.Where(x=>x.Id==w.ShopId).Select(x=>x.Name).SingleAsync(),
+            Branding=await db.ShopProfiles.Where(x=>x.ShopId==w.ShopId).Select(x=>new{x.LogoDataUrl,x.PrimaryColor,x.RequireSignature,x.Phone,x.Address}).SingleOrDefaultAsync(),Paid=await Paid(w.Id,w.ShopId),
             Quote=q is null?null:new{q.Id,q.Revision,q.Currency,q.Total,q.Terms,q.WarrantyDays,q.Status,q.ExpiresAtUtc,q.DecidedAtUtc,q.DecisionBy,Lines=lines.Select(l=>new{l.Description,l.Quantity,l.UnitPrice})}}});
     }
     [AllowAnonymous,HttpPost("portal/decision")]
@@ -246,7 +242,11 @@ public sealed class WorkshopController(RepairShopDbContext db, IWebHostEnvironme
             var(w,o)=await Load(grant.Id,grant.ShopId,true);
             if(w.PortalTokenHash!=hash||w.PortalExpiresAtUtc<=DateTime.UtcNow)throw new WorkflowConflict("El enlace fue renovado. Pedí el enlace actual.");
             RequireOpen(o);var q=await LatestQuote(w.Id,w.ShopId);if(q?.Id!=b.QuoteId)throw new WorkflowConflict("Hay una nueva versión del presupuesto. Actualizá la página.");
-            q.Decide(b.Accept,b.Name,DateTime.UtcNow);w.Version++;return new{q.Status};
+            var profile=await RepairShop.Api.Saas.ShopProvisioning.EnsureProfile(db,w.ShopId);
+            if(b.Accept&&profile.RequireSignature&&string.IsNullOrEmpty(b.Signature))throw new DomainException("Firmá en el recuadro para aprobar el presupuesto.");
+            q.Decide(b.Accept,b.Name,DateTime.UtcNow);w.Version++;
+            await events.QuoteDecided(w.ShopId,w.Id,q.Id,b.Accept,b.Name.Trim(),b.Signature??"",HttpContext.Connection.RemoteIpAddress?.ToString()??"",Request.Headers.UserAgent.ToString());
+            return new{q.Status};
         });
     }
 
@@ -268,5 +268,38 @@ public sealed class WorkshopController(RepairShopDbContext db, IWebHostEnvironme
     {
         var p=await db.WorkflowPhotos.SingleOrDefaultAsync(x=>x.Id==photoId&&x.OrderId==id&&x.ShopId==ShopId);if(p is null)return NotFound();
         return PhysicalFile(Path.Combine(env.ContentRootPath,"data","photos",p.FileName),p.MimeType);
+    }
+}
+
+public static class WorkshopIntake
+{
+    public static async Task<(Guid Id, long Number)> Create(RepairShopDbContext db, Guid shop, Guid actor, IntakeRequest b)
+    {
+        var now=DateTime.UtcNow;
+        var customer=b.CustomerId.HasValue ? await db.Customers.SingleOrDefaultAsync(x=>x.Id==b.CustomerId && x.ShopId==shop) : null;
+        if(b.CustomerId.HasValue && customer is null) throw new DomainException("Cliente no disponible en este taller.");
+        if(customer is null){customer=new Customer(shop,b.CustomerName,b.Phone,null,now);db.Customers.Add(customer);}
+        var device=b.DeviceId.HasValue ? await db.Devices.SingleOrDefaultAsync(x=>x.Id==b.DeviceId && x.ShopId==shop && x.CustomerId==customer.Id) : null;
+        if(b.DeviceId.HasValue && device is null) throw new DomainException("El equipo no pertenece al cliente seleccionado.");
+        if(device is null){device=new Device(shop,customer.Id,b.Brand,b.Model,null,b.Identifier,null,now);db.Devices.Add(device);}
+        var order=new RepairOrder(shop,customer.Id,device.Id,b.Issue,null,now);db.RepairOrders.Add(order);
+        var w=new WorkshopWorkflow {Id=order.Id,ShopId=shop,CustomerName=customer.FullName,CustomerPhone=customer.Phone,
+            DeviceLabel=$"{device.Brand} {device.Model}",Identifier=device.SerialNumber,Condition=b.Condition??"",Accessories=b.Accessories??"",
+            Priority=b.Priority=="Alta"?"Alta":"Normal",IntakeChecksJson=JsonSerializer.Serialize(ValidateChecks(b.Checks),new JsonSerializerOptions(JsonSerializerDefaults.Web))};
+        db.Workflows.Add(w);
+        db.RepairOrderNotes.Add(new RepairOrderNote(shop,order.Id,"Equipo recibido y condición de ingreso registrada.",actor,now));
+        var branch = await db.PremiumBranches.Where(x => x.ShopId == shop).OrderBy(x => x.CreatedAtUtc).FirstOrDefaultAsync();
+        if (branch is not null) db.OrderBusinesses.Add(new RepairShop.Domain.Premium.OrderBusiness { ShopId = shop, OrderId = order.Id, BranchId = branch.Id });
+        await db.SaveChangesAsync();
+        return (order.Id,w.Number);
+    }
+
+    private static readonly string[] Tests = ["Pantalla y táctil", "Cámaras", "Audio y micrófono", "Carga", "Botones", "Biometría"];
+    private static Dictionary<string,string> ValidateChecks(Dictionary<string,string>? checks)
+    {
+        checks ??= new();
+        if (checks.Any(x => !Tests.Contains(x.Key) || !new[]{"ok","fail","untested","na"}.Contains(x.Value)))
+            throw new DomainException("Hay resultados de checklist inválidos.");
+        return checks;
     }
 }

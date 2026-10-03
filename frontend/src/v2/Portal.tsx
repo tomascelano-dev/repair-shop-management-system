@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { request, code, money, date, fullDate, quoteNames } from "./api";
 import { Brand, Status, Field, ErrorBox, Loading } from "./ui";
+import { SignaturePad } from "./saas/Widgets";
+import "./saas/saas.css";
 
 export default function Portal() {
   const token = window.location.hash.slice(1);
@@ -16,6 +18,7 @@ export default function Portal() {
   const [name, setName] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [signature, setSignature] = useState("");
   const load = useCallback(async () => {
     try {
       setD(await request("/api/v2/portal", "GET", undefined, token));
@@ -38,7 +41,7 @@ export default function Portal() {
       await request(
         "/api/v2/portal/decision",
         "POST",
-        { quoteId: q.id, accept, name },
+        { quoteId: q.id, accept, name, signature: accept ? signature : "" },
         token,
       );
       await load();
@@ -49,9 +52,20 @@ export default function Portal() {
     }
   }
   return (
-    <div className="portal-page">
+    <div
+      className="portal-page"
+      style={{ ["--shop" as any]: d?.branding?.primaryColor || "#117f76" }}
+    >
       <header>
-        <Brand />
+        {d?.branding?.logoDataUrl ? (
+          <img
+            className="portal-logo"
+            src={d.branding.logoDataUrl}
+            alt={d.shopName}
+          />
+        ) : (
+          <Brand />
+        )}
         <span className="soft-label">Portal del cliente</span>
       </header>
       <main>
@@ -144,6 +158,13 @@ export default function Portal() {
                         placeholder="Nombre de quien autoriza"
                       />
                     </Field>
+                    <div className="field">
+                      <span>
+                        Firma
+                        {d.branding?.requireSignature ? "" : " (opcional)"}
+                      </span>
+                      <SignaturePad onChange={setSignature} />
+                    </div>
                     <label className="checkbox-label">
                       <input
                         type="checkbox"
@@ -164,7 +185,11 @@ export default function Portal() {
                       </button>
                       <button
                         className="button primary"
-                        disabled={busy || !agreed}
+                        disabled={
+                          busy ||
+                          !agreed ||
+                          (d.branding?.requireSignature && !signature)
+                        }
                       >
                         <CheckCircle2 size={17} />
                         {busy ? "Registrando…" : "Aprobar presupuesto"}
@@ -212,7 +237,11 @@ export default function Portal() {
           </>
         )}
       </main>
-      <footer>RepairShop · Información compartida por tu taller</footer>
+      <footer>
+        {d?.shopName || "RepairShop"}
+        {d?.branding?.phone ? ` · ${d.branding.phone}` : ""}
+        {d?.branding?.address ? ` · ${d.branding.address}` : ""}
+      </footer>
     </div>
   );
 }

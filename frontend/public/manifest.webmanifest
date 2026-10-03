@@ -1,0 +1,19 @@
+{
+  "name": "RepairShop",
+  "short_name": "RepairShop",
+  "description": "Gestión de talleres de reparación: órdenes, técnicos, caja y turnos.",
+  "start_url": "/tech",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f8f8",
+  "theme_color": "#117f76",
+  "lang": "es-AR",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Mi trabajo", "url": "/tech" },
+    { "name": "Agenda", "url": "/agenda" },
+    { "name": "Caja", "url": "/cash" }
+  ]
+}

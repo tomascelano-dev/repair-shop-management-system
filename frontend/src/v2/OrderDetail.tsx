@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  ChevronDown,
   Copy,
   ExternalLink,
   ImagePlus,
@@ -29,7 +30,24 @@ import {
   TOKEN_KEY,
   USER_KEY,
 } from "./api";
-import { Status, Field, ErrorBox, Loading, Modal, Empty } from "./ui";
+import {
+  Status,
+  Field,
+  ErrorBox,
+  Loading,
+  Modal,
+  Empty,
+  MenuButton,
+} from "./ui";
+import { useSession } from "./saas/session";
+import { OrderOnline, DamageDiagram } from "./saas/OrderExtras";
+
+const orderModules = [
+  { module: "stock", label: "Repuestos y reservas" },
+  { module: "profit", label: "Costos y rentabilidad" },
+  { module: "warranties", label: "Garantías" },
+  { module: "business", label: "Sucursal y empresa" },
+];
 
 const checkLabels: Record<string, string> = {
   ok: "Funciona",
@@ -39,6 +57,7 @@ const checkLabels: Record<string, string> = {
 };
 export default function OrderDetail({ onChanged }: { onChanged: () => void }) {
   const { id } = useParams();
+  const { has } = useSession();
   const [d, setD] = useState<any>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -168,39 +187,53 @@ export default function OrderDetail({ onChanged }: { onChanged: () => void }) {
       </Link>
       <div className="page-heading order-heading">
         <div>
-          <span className="eyebrow">
-            {code(w.number)} {w.isDemo && "· DEMO"}
-          </span>
           <h1>{w.deviceLabel}</h1>
           <p>
-            {w.customerName} <span className="separator">/</span> Ingresó el{" "}
+            {code(w.number)} {w.isDemo && "· DEMO"}{" "}
+            <span className="separator">·</span> {w.customerName}
+            {w.customerPhone && ` · ${w.customerPhone}`}{" "}
+            <span className="separator">·</span> Ingresó el{" "}
             {date(o.createdAtUtc)}
           </p>
         </div>
         <div className="heading-actions">
           <Status value={status} />
-          <button
-            className="button secondary small"
-            onClick={() => window.print()}
+          <MenuButton
+            label={
+              <>
+                <Printer size={16} />
+                Imprimir
+                <ChevronDown size={14} />
+              </>
+            }
           >
-            <Printer size={16} />
-            Comprobante
-          </button>
+            <a href={`/print/order/${id}`} target="_blank" rel="noreferrer">
+              Ticket
+            </a>
+            <button onClick={() => window.print()}>Comprobante A4</button>
+          </MenuButton>
+          {orderModules.some((m) => has(m.module)) && (
+            <MenuButton
+              label={
+                <>
+                  Más
+                  <ChevronDown size={14} />
+                </>
+              }
+            >
+              {orderModules
+                .filter((m) => has(m.module))
+                .map((m) => (
+                  <Link key={m.module} to={`/premium/${m.module}?order=${id}`}>
+                    {m.label}
+                  </Link>
+                ))}
+            </MenuButton>
+          )}
         </div>
       </div>
       <ErrorBox message={error} />
-      <div className="premium-context-bar" style={{ marginBottom: 18 }}>
-        <Link to={`/premium/stock?order=${id}`}>Repuestos y reservas</Link>
-        <Link to={`/premium/profit?order=${id}`}>Costos y rentabilidad</Link>
-        <Link to={`/premium/warranties?order=${id}`}>Garantías</Link>
-        <Link to={`/premium/business?order=${id}`}>Sucursal y empresa</Link>
-      </div>
       <div className="order-summary-strip">
-        <div>
-          <small>Cliente</small>
-          <strong>{w.customerName}</strong>
-          <span>{w.customerPhone}</span>
-        </div>
         <div>
           <small>Presupuesto vigente</small>
           <strong>{q ? money(q.total, currency) : "Por definir"}</strong>
@@ -270,19 +303,41 @@ export default function OrderDetail({ onChanged }: { onChanged: () => void }) {
         </div>
       </div>
       <div className="tabs">
-        {["Resumen", "Diagnóstico", "Presupuesto", "Cobros", "Historial"].map(
-          (t) => (
-            <button
-              key={t}
-              className={tab === t ? "active" : ""}
-              onClick={() => setTab(t)}
-            >
-              {t}
-              {t === "Cobros" && <span>{d.payments.length}</span>}
-            </button>
-          ),
-        )}
+        {[
+          "Resumen",
+          "Diagnóstico",
+          "Daños",
+          "Presupuesto",
+          "Cobros",
+          "Cliente y factura",
+          "Historial",
+        ].map((t) => (
+          <button
+            key={t}
+            className={tab === t ? "active" : ""}
+            onClick={() => setTab(t)}
+          >
+            {t}
+            {t === "Cobros" && <span>{d.payments.length}</span>}
+          </button>
+        ))}
       </div>
+      {tab === "Daños" && <DamageDiagram orderId={id!} closed={closed} />}
+      {tab === "Cliente y factura" && (
+        <OrderOnline
+          orderId={id!}
+          version={w.version}
+          customerName={w.customerName}
+          due={due}
+          currency={currency}
+          accepted={q?.status === "Accepted"}
+          closed={closed}
+          onChanged={() => {
+            load();
+            onChanged();
+          }}
+        />
+      )}
       {tab === "Resumen" && (
         <div className="detail-grid">
           <div className="stack">
@@ -399,7 +454,7 @@ export default function OrderDetail({ onChanged }: { onChanged: () => void }) {
               </button>
               {link && (
                 <div className="portal-link-box">
-                  <p>Enlace creado para esta computadora.</p>
+                  <p>Enlace listo para compartir con el cliente.</p>
                   <a
                     className="button secondary full"
                     href={link}
@@ -443,7 +498,7 @@ export default function OrderDetail({ onChanged }: { onChanged: () => void }) {
               )}
               <small>
                 Al renovar, el enlace anterior deja de funcionar. Vigencia: 30
-                días. En esta versión local se abre desde esta PC.
+                días.
               </small>
             </section>
             <section className="panel padded">

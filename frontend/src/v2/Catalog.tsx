@@ -37,9 +37,6 @@ export default function Catalog({ type }: { type: "customers" | "inventory" }) {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">
-            {stock ? "REPUESTOS Y MATERIALES" : "PERSONAS QUE CONFÍAN EN VOS"}
-          </span>
           <h1>{stock ? "Inventario" : "Clientes"}</h1>
           <p>
             {stock
@@ -218,8 +215,7 @@ export default function Catalog({ type }: { type: "customers" | "inventory" }) {
               </div>
             ) : (
               <p className="muted">
-                No hay movimientos adicionales. El stock demo se cargó como
-                existencia inicial.
+                No hay movimientos registrados para este artículo.
               </p>
             )}
           </div>

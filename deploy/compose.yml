@@ -1,0 +1,112 @@
+# RepairShop SaaS · production stack
+# Usage (on the server, from this folder):
+#   cp .env.example .env   # fill in the values
+#   docker compose up -d --build
+name: repairshop
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: repairshop
+      POSTGRES_USER: repairshop
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U repairshop -d repairshop"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ../RepairShop
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__RepairShopDb: Host=db;Port=5432;Database=repairshop;Username=repairshop;Password=${DB_PASSWORD}
+      Jwt__Key: ${JWT_KEY:?Set JWT_KEY in .env}
+      Jwt__Issuer: RepairShop
+      Jwt__Audience: RepairShop
+      AllowedHosts: ${DOMAIN};localhost
+      Cors__AllowedOrigins__0: https://${DOMAIN}
+      Swagger__Enabled: "false"
+      Seed__Enabled: "false"
+      Database__Init: Migrate
+      Saas__PublicAppUrl: https://${DOMAIN}
+      Saas__TrialDays: ${TRIAL_DAYS:-14}
+      Saas__DataProtectionKeysPath: /app/data/keys
+      Saas__Prices__Basic: ${PRICE_BASIC:-29900}
+      Saas__Prices__Standard: ${PRICE_STANDARD:-44900}
+      Saas__Prices__Pro: ${PRICE_PRO:-74900}
+      Saas__Billing__Provider: ${BILLING_PROVIDER:-MercadoPago}
+      Saas__Billing__AccessToken: ${MP_ACCESS_TOKEN:-}
+      Saas__Billing__WebhookSecret: ${MP_WEBHOOK_SECRET:-}
+      Saas__Fiscal__Provider: ${FISCAL_PROVIDER:-Arca}
+      Saas__Messaging__Provider: ${MESSAGING_PROVIDER:-Live}
+      Saas__Messaging__Smtp__Host: ${SMTP_HOST:-}
+      Saas__Messaging__Smtp__Port: ${SMTP_PORT:-587}
+      Saas__Messaging__Smtp__User: ${SMTP_USER:-}
+      Saas__Messaging__Smtp__Password: ${SMTP_PASSWORD:-}
+      Saas__Messaging__Smtp__From: ${SMTP_FROM:-}
+      Saas__Messaging__Sms__AccountSid: ${SMS_ACCOUNT_SID:-}
+      Saas__Messaging__Sms__AuthToken: ${SMS_AUTH_TOKEN:-}
+      Saas__Messaging__Sms__From: ${SMS_FROM:-}
+    volumes:
+      # Photos, Data Protection keys (ARCA certificates and webhook secrets depend on them).
+      - app_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/readyz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    depends_on: [api]
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+  backup:
+    build: ./backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGDATABASE: repairshop
+      PGUSER: repairshop
+      PGPASSWORD: ${DB_PASSWORD}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-6}
+      # Optional off-site copy with rclone (e.g. "b2:repairshop-backups"); configure rclone.conf below.
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-}
+    volumes:
+      - backups:/backups
+      - app_data:/app/data:ro
+      - ./backup/rclone.conf:/config/rclone/rclone.conf:ro
+
+volumes:
+  db_data:
+  app_data:
+  caddy_data:
+  caddy_config:
+  backups:

@@ -1,0 +1,12 @@
+# Override for servers that already run a reverse proxy on 80/443 (for example Caddy on the host
+# with a Cloudflare origin certificate). The web container serves plain HTTP on 127.0.0.1:${WEB_PORT}
+# and the host proxy terminates TLS and forwards ${DOMAIN} to it.
+# Usage (from this folder):
+#   docker compose -f compose.yml -f compose.behind-proxy.yml up -d --build
+services:
+  web:
+    environment:
+      # Caddy site address: listen on :80 inside the container, no automatic HTTPS.
+      DOMAIN: ":80"
+    ports: !override
+      - "127.0.0.1:${WEB_PORT:-8085}:80"
