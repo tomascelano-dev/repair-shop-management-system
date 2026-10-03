@@ -9,7 +9,7 @@ import { Alert, Button, Field, Input, Loading } from '../../components/ui'
 
 export function AuthCard({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-full items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 px-4 py-10">
+    <div className="flex min-h-full flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 px-4 py-10">
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
         <div className="mb-5 flex items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">RS</span>
@@ -20,9 +20,26 @@ export function AuthCard({ title, subtitle, children }: { title: string; subtitl
         </div>
         {children}
       </div>
+      <nav aria-label="Legales" className="mt-4 text-center text-xs text-slate-400">
+        {LEGAL_LINKS.map((l, i) => (
+          <span key={l.to}>
+            {i > 0 && ' · '}
+            <Link to={l.to} className="hover:text-white hover:underline">
+              {l.label}
+            </Link>
+          </span>
+        ))}
+      </nav>
     </div>
   )
 }
+
+const LEGAL_LINKS = [
+  { to: '/precios', label: 'Precios' },
+  { to: '/terminos', label: 'Términos' },
+  { to: '/privacidad', label: 'Privacidad' },
+  { to: '/reembolsos', label: 'Reembolsos' },
+]
 
 const DEMO_USERS = [
   { email: 'admin@local', password: 'Admin123456', role: 'Administrador' },
