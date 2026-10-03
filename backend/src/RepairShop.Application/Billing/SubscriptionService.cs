@@ -199,7 +199,7 @@ public sealed class SubscriptionService
 
         var state = await gateway.GetSubscriptionAsync(preapprovalId, ct);
         if (state is null) return WebhookOutcome.Ignored;
-        return new WebhookOutcome(true, await ApplyAsync(BillingProvider.MercadoPago, state, ct));
+        return new WebhookOutcome(true, await _uow.RetryOnConflictAsync(c => ApplyAsync(BillingProvider.MercadoPago, state, c), ct, maxAttempts: 6));
     }
 
     /// <summary>Paddle Billing notifications (subscription.*). Not accepted when the signature is invalid.</summary>
@@ -215,10 +215,14 @@ public sealed class SubscriptionService
 
         var state = gateway.ParseWebhook(rawBody);
         if (state is null) return WebhookOutcome.Ignored;
-        return new WebhookOutcome(true, await ApplyAsync(BillingProvider.Paddle, state, ct));
+        return new WebhookOutcome(true, await _uow.RetryOnConflictAsync(c => ApplyAsync(BillingProvider.Paddle, state, c), ct, maxAttempts: 6));
     }
 
-    /// <summary>Applies the provider state and returns the organization it belongs to (null when unknown).</summary>
+    /// <summary>
+    /// Applies the provider state and returns the organization it belongs to (null when unknown). Providers send
+    /// several events for one subscription at the same moment (Paddle: subscription.created and .activated), so
+    /// callers retry on a row version conflict instead of failing the webhook.
+    /// </summary>
     private async Task<Guid?> ApplyAsync(BillingProvider provider, GatewaySubscriptionState state, CancellationToken ct)
     {
         var now = _clock.UtcNow;
