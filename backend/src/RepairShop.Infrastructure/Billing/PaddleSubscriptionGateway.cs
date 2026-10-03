@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RepairShop.Application.Abstractions;
 using RepairShop.Application.Billing;
@@ -21,11 +22,13 @@ public sealed class PaddleSubscriptionGateway : IPaddleSubscriptionGateway
 
     private readonly IHttpClientFactory _http;
     private readonly BillingOptions _options;
+    private readonly ILogger<PaddleSubscriptionGateway> _logger;
 
-    public PaddleSubscriptionGateway(IHttpClientFactory http, IOptions<BillingOptions> options)
+    public PaddleSubscriptionGateway(IHttpClientFactory http, IOptions<BillingOptions> options, ILogger<PaddleSubscriptionGateway> logger)
     {
         _http = http;
         _options = options.Value;
+        _logger = logger;
     }
 
     public BillingProvider Provider => BillingProvider.Paddle;
@@ -140,9 +143,30 @@ public sealed class PaddleSubscriptionGateway : IPaddleSubscriptionGateway
             using var res = await _http.CreateClient(HttpClientName).SendAsync(req, ct);
             if (allowNotFound && res.StatusCode == HttpStatusCode.NotFound) return null;
             var body = await res.Content.ReadAsStringAsync(ct);
-            if (!res.IsSuccessStatusCode) throw new DomainException($"Paddle no pudo {what} ({(int)res.StatusCode}). Probá de nuevo en unos minutos.");
+            if (!res.IsSuccessStatusCode)
+            {
+                var (code, detail) = ErrorOf(body);
+                _logger.LogWarning("Paddle: {Action} failed with {Status}: {Code} {Detail}", what, (int)res.StatusCode, code, detail);
+                // 401/403 mean the platform's credentials are wrong, which retrying will not fix.
+                if (res.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                    throw new DomainException("El cobro con Paddle no está bien configurado todavía. Escribinos y lo resolvemos.");
+                throw new DomainException($"Paddle no pudo {what} ({(int)res.StatusCode}). Probá de nuevo en unos minutos.");
+            }
             return JsonDocument.Parse(body);
         }
+    }
+
+    /// <summary>Paddle errors: {"error":{"code":"forbidden","detail":"..."}}.</summary>
+    private static (string? Code, string? Detail) ErrorOf(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            return doc.RootElement.TryGetProperty("error", out var e) && e.ValueKind == JsonValueKind.Object
+                ? (Str(e, "code"), Str(e, "detail"))
+                : (null, null);
+        }
+        catch (JsonException) { return (null, null); }
     }
 
     private static bool IsSafeId(string? id) => !string.IsNullOrWhiteSpace(id) && id.Length <= 64 && id.All(c => char.IsLetterOrDigit(c) || c == '_');
