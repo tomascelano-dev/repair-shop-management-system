@@ -43,12 +43,14 @@
 		@other not path /assets/*
 		header @other Cache-Control "no-cache"
 		# The bare domain is the product's public face: browsers without a session (visitors, crawlers, payment
-		# provider reviewers) get the pre-rendered pricing page; signed-in browsers (rs_app cookie) get the app.
+		# provider reviewers) get the pre-rendered landing page; signed-in browsers (rs_app cookie) get the app.
 		@public_root {
 			path /
 			not header_regexp Cookie (^|;\s*)rs_app=1
 		}
-		rewrite @public_root /precios.html
+		rewrite @public_root /home.html
+		@english_root path /en /en/
+		rewrite @english_root /en.html
 		# The public pages are pre-rendered at build time (precios.html, terminos.html...) so they have content
 		# without JavaScript; every other route gets the SPA shell.
 		try_files {path} {path}.html /index.html
@@ -56,7 +58,7 @@
 		# GET only: Caddy answers HEAD on a templated file with an empty body (Content-Length: 0), which site
 		# checkers read as a blank page; HEAD gets the plain file instead.
 		@prerendered {
-			path /precios.html /terminos.html /privacidad.html /reembolsos.html
+			path /home.html /precios.html /terminos.html /privacidad.html /reembolsos.html /en.html /en/pricing.html /en/terms.html /en/privacy.html /en/refunds.html
 			method GET
 		}
 		templates @prerendered {

@@ -33,9 +33,9 @@ test('a new shop signs up, gets the trial and picks a plan', async ({ page }) =>
 })
 
 // Paddle reviews the domain before approving the account: it must show the product and prices and link these pages.
-test('the bare domain shows the pricing page, which links terms, privacy and refund policy', async ({ page }) => {
+test('the bare domain shows the landing page, which links terms, privacy and refund policy', async ({ page }) => {
   await page.goto('/')
-  await expect(page).toHaveURL(/\/precios$/)
+  await expect(page.getByRole('heading', { name: 'Más reparaciones. Menos papeleo.' })).toBeVisible()
   const footer = page.getByRole('contentinfo')
   for (const [link, heading] of [
     ['Términos', 'Términos del servicio'],

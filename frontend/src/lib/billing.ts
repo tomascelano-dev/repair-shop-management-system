@@ -28,13 +28,13 @@ export const COUNTRIES: { code: string; name: string }[] = [
   { code: 'OT', name: 'Otro país' },
 ]
 
-/** Best guess of the visitor's country from the browser language (es-MX → MX). Defaults to Argentina. */
+/** Best guess from browser language (es-MX → MX). Unknown regions use international USD pricing. */
 export function detectCountry(languages: readonly string[] = typeof navigator === 'undefined' ? [] : navigator.languages ?? [navigator.language]): string {
   for (const lang of languages) {
     const region = lang.split('-')[1]?.toUpperCase()
     if (region && COUNTRIES.some((c) => c.code === region)) return region
   }
-  return 'AR'
+  return 'US'
 }
 
 /** "Otro país" is billed like any country outside Argentina. */

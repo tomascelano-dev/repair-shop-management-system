@@ -143,6 +143,55 @@ Los talleres que ya existían antes de esta versión tienen el plan Profesional 
 docker compose exec api dotnet RepairShop.Api.dll admin plan <email> Pro
 ```
 
+## Sitio público y anuncios
+
+La landing pública está en `/` (español neutro) y `/en` (inglés). Los usuarios con sesión conservan su panel en `/`.
+Precios: `/precios` y `/en/pricing`; registro: `/registro` y `/en/signup`. Términos, privacidad y reembolsos
+tienen versiones en ambos idiomas. La landing, los precios y las páginas legales se generan como HTML durante
+el build; Caddy completa `CONTACT_EMAIL` y `LEGAL_NAME` al servirlas. La interfaz interna del taller sigue en español.
+
+Las etiquetas son opcionales y se configuran en `deploy/.env`:
+
+| Variable | Contenido |
+| --- | --- |
+| `GA4_ID` | ID de medición de Google Analytics (`G-...`) |
+| `GOOGLE_ADS_ID` | ID de Google Ads (`AW-...`) |
+| `GOOGLE_ADS_SIGNUP_LABEL` | Etiqueta de conversión para registro/prueba iniciada |
+| `GOOGLE_ADS_PURCHASE_LABEL` | Etiqueta de conversión para el primer pago |
+| `META_PIXEL_ID` | ID del píxel/dataset de Meta |
+| `META_CAPI_TOKEN` | Token privado de Conversions API, solo en la API |
+| `META_TEST_EVENT_CODE` | Código de prueba de Meta; vacío al terminar la validación |
+
+Después de editar `.env`, ejecutar `docker compose up -d`. Los campos vacíos no cargan etiquetas. La configuración
+pública entrega únicamente IDs de etiquetas; el token de Meta nunca se entrega al navegador.
+
+Se usa Consent Mode v2 **básico**: las cuatro señales de Google empiezan denegadas, y los scripts de Google y Meta
+se cargan solo tras aceptar las cookies opcionales, en todos los países. Se puede rechazar o cambiar la elección
+desde el pie de las páginas públicas. Al rechazar con la sesión del administrador iniciada, la API también retira
+el consentimiento del taller y descarta las conversiones que aún no se enviaron. Volver a aceptar en el navegador
+no reactiva automáticamente el permiso previamente retirado en el servidor.
+
+Los parámetros UTM y los IDs de clic se conservan durante la visita solo tras aceptar la medición y se asocian
+al registro. El píxel y Conversions API comparten `event_id` para deduplicar `StartTrial` y `Purchase`. El evento
+de compra representa el primer pago de una suscripción; las renovaciones no crean otra conversión. El navegador
+lo informa al confirmar el retorno del checkout; el servidor lo informa mediante los webhooks verificados.
+Las compras simuladas y los planes bonificados no se reportan como compras reales. La API reintenta errores
+transitorios de Meta hasta seis veces y descarta eventos vencidos o con consentimiento retirado.
+
+En Google Analytics, desactivar las vistas automáticas por cambios de historial y la medición mejorada de
+formularios: la aplicación envía sus propias vistas de páginas públicas y conversiones, sin parámetros de
+autenticación ni rutas de clientes u órdenes.
+
+Para consultar el origen de las altas:
+
+```bash
+docker compose exec api dotnet RepairShop.Api.dll admin signups
+```
+
+Antes de activar campañas, probar aceptar/rechazar cookies, un alta y un pago en sandbox con las herramientas
+de depuración de Google y Meta. El alta pública continúa controlada por `SIGNUP_ENABLED`; mantenerla en `false`
+hasta completar la configuración de cobros.
+
 ## Notas de seguridad
 
 - Solo el contenedor `web` publica un puerto, y solo en `127.0.0.1`: desde internet se llega únicamente a través del proxy con HTTPS.

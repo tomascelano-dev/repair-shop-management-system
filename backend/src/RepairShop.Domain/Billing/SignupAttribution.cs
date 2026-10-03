@@ -31,7 +31,7 @@ public sealed class SignupAttribution
     public string? LandingPath { get; private set; }
     public string? Referrer { get; private set; }
 
-    /// <summary>The visitor accepted advertising cookies (or was not asked to, outside the EU) when signing up.</summary>
+    /// <summary>The visitor explicitly accepted advertising measurement when signing up.</summary>
     public bool AdConsent { get; private set; }
 
     /// <summary>Id the website used for the trial conversion, so the server-side copy is deduplicated.</summary>
@@ -70,6 +70,8 @@ public sealed class SignupAttribution
 
     /// <summary>True when the signup carries any campaign or click information.</summary>
     public bool FromCampaign => Source is not null || Campaign is not null || Gclid is not null || Gbraid is not null || Wbraid is not null || Fbclid is not null;
+
+    public void RevokeAdConsent() => AdConsent = false;
 
     private static string? Clean(string? value, int max)
     {

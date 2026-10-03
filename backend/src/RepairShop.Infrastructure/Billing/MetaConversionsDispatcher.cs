@@ -48,6 +48,13 @@ public sealed class MetaConversionsDispatcher
         // Meta only accepts events from the last 7 days.
         foreach (var stale in due.Where(x => x.CreatedAtUtc < now.AddDays(-6)))
             stale.RegisterFailure("Expired before it could be sent.", permanent: true, now);
+        // Recheck consent before delivery: an owner may have withdrawn it after these events were queued.
+        var organizations = due.Select(x => x.OrganizationId).Distinct().ToArray();
+        var consented = await _db.SignupAttributions.AsNoTracking()
+            .Where(x => organizations.Contains(x.OrganizationId) && x.AdConsent)
+            .Select(x => x.OrganizationId).ToListAsync(ct);
+        foreach (var revoked in due.Where(x => x.Status == AdConversionStatus.Pending && !consented.Contains(x.OrganizationId)))
+            revoked.RegisterFailure("Advertising consent withdrawn.", permanent: true, now);
         var batch = due.Where(x => x.Status == AdConversionStatus.Pending).ToList();
 
         if (batch.Count > 0)

@@ -7,6 +7,7 @@ using RepairShop.Api.Billing;
 using RepairShop.Api.Common;
 using RepairShop.Api.Security;
 using RepairShop.Application.Billing;
+using RepairShop.Application.Abstractions;
 using RepairShop.Application.Contracts;
 
 namespace RepairShop.Api.Controllers;
@@ -60,6 +61,19 @@ public sealed class BillingController : ControllerBase
     [HttpGet("subscription")]
     public async Task<ActionResult<ApiResponse<SubscriptionResponse>>> Get(CancellationToken ct)
         => Ok(Envelope.Ok(await _subscriptions.GetAsync(CurrentUser.GetOrganizationId(User), CurrentUser.GetUserId(User), ct)));
+
+    [HttpPost("ad-consent/revoke")]
+    [Authorize(Policy = Policies.AdminOnly)]
+    public async Task<IActionResult> RevokeAdConsent([FromServices] IAdTrackingRepository tracking, [FromServices] IUnitOfWork uow, CancellationToken ct)
+    {
+        var attribution = await tracking.GetAttributionAsync(CurrentUser.GetOrganizationId(User), ct);
+        if (attribution is not null)
+        {
+            attribution.RevokeAdConsent();
+            await uow.SaveChangesAsync(ct);
+        }
+        return NoContent();
+    }
 
     [HttpPost("checkout")]
     [Authorize(Policy = Policies.AdminOnly)]

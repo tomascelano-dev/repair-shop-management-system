@@ -5,8 +5,8 @@ describe('billing helpers', () => {
   it('detects the country from the browser language', () => {
     expect(detectCountry(['es-MX', 'es'])).toBe('MX')
     expect(detectCountry(['en', 'es-ES'])).toBe('ES')
-    expect(detectCountry(['fr-FR'])).toBe('AR')
-    expect(detectCountry([])).toBe('AR')
+    expect(detectCountry(['fr-FR'])).toBe('US')
+    expect(detectCountry([])).toBe('US')
   })
 
   it('bills "other country" like any country outside Argentina', () => {

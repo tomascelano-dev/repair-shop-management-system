@@ -1179,6 +1179,34 @@ export interface BillingConfig {
   contactEmail: string | null
   /** Seller shown in the Terms; null until the platform sets LEGAL_NAME. */
   legalName: string | null
+  tracking?: TrackingConfig
+  visitorCountry?: string | null
+}
+
+export interface TrackingConfig {
+  ga4Id: string | null
+  googleAdsId: string | null
+  googleAdsSignupLabel: string | null
+  googleAdsPurchaseLabel: string | null
+  metaPixelId: string | null
+}
+
+export interface SignupAttribution {
+  utmSource?: string
+  utmMedium?: string
+  utmCampaign?: string
+  utmTerm?: string
+  utmContent?: string
+  gclid?: string
+  gbraid?: string
+  wbraid?: string
+  fbclid?: string
+  fbp?: string
+  fbc?: string
+  landingPath?: string
+  referrer?: string
+  adConsent: boolean
+  eventId?: string
 }
 
 export interface Subscription {
@@ -1202,6 +1230,7 @@ export interface Subscription {
   checkoutAvailable: boolean
   emailVerified: boolean
   plans: Plan[]
+  conversionId?: string | null
 }
 
 export interface CheckoutResult {
@@ -1217,4 +1246,5 @@ export interface SignupInput {
   country: string
   timeZone?: string
   acceptTerms: boolean
+  attribution?: SignupAttribution
 }
