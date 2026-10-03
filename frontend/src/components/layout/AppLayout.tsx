@@ -7,6 +7,7 @@ import { useSession } from '../../auth/session'
 import { cn } from '../../lib/cn'
 import { initials } from '../../lib/format'
 import { ROLE } from '../../lib/labels'
+import { SubscriptionBanner } from './SubscriptionBanner'
 
 interface NavItem {
   to: string
@@ -50,6 +51,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { to: '/reports', label: 'Reportes', icon: '◔', permission: 'reports' },
       { to: '/messages', label: 'Mensajes', icon: '✉', permission: 'orders.work' },
       { to: '/settings', label: 'Configuración', icon: '⚙', permission: 'admin' },
+      { to: '/billing', label: 'Suscripción', icon: '★', permission: 'admin' },
     ],
   },
 ]
@@ -154,6 +156,7 @@ export function AppLayout() {
           <UserMenu name={user?.displayName ?? ''} role={user ? ROLE[user.role] : ''} onLogout={logout} />
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
+          <SubscriptionBanner />
           <Outlet />
         </main>
       </div>

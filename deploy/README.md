@@ -120,6 +120,28 @@ Los datos cargados en otra versión no pasan a esta: son bases con estructuras d
 
 Después de cambiar `.env`: `docker compose up -d`.
 
+## Suscripciones (cobro a los talleres)
+
+Cualquier taller puede crear su cuenta en `/registro` y usar todo gratis durante `TRIAL_DAYS` días, sin tarjeta. Al terminar la prueba, la cuenta queda en modo consulta hasta que elija un plan en **Suscripción**. Los precios públicos están en `/precios`.
+
+- **Argentina** paga en pesos con **Mercado Pago** (suscripción mensual). Usa tu cuenta de Mercado Pago, no la de un taller.
+  1. En https://www.mercadopago.com.ar/developers → Tus integraciones → tu aplicación → Credenciales de producción: copiá el *Access token* a `MP_BILLING_ACCESS_TOKEN`.
+  2. En Webhooks → Configurar notificaciones: URL `https://app.techxto.ar/api/v1/billing/webhooks/mercadopago`, eventos **Planes y suscripciones**. Copiá la clave secreta a `MP_BILLING_WEBHOOK_SECRET`.
+- **Resto del mundo** paga en dólares con **Paddle**, que cobra como revendedor (merchant of record): agrega los impuestos de cada país y te liquida el neto. Vos le emitís una factura E por cada liquidación.
+  1. Creá la cuenta en https://www.paddle.com y completá la verificación del negocio (empezá en sandbox: https://sandbox-vendors.paddle.com).
+  2. Catálogo → Productos: un producto "RepairShop" con tres precios mensuales en USD (Básico, Estándar, Profesional). Copiá los ids `pri_...` a `PADDLE_PRICE_BASIC`, `PADDLE_PRICE_STANDARD` y `PADDLE_PRICE_PRO`, y que los montos coincidan con `PRICE_USD_*`.
+  3. Checkout → Configuración: *Default payment link* = `https://app.techxto.ar/billing` (y aprobá el dominio `app.techxto.ar`).
+  4. Developer tools → Authentication: una *API key* (`PADDLE_API_KEY`) y un *client-side token* (`PADDLE_CLIENT_TOKEN`).
+  5. Developer tools → Notifications: destino `https://app.techxto.ar/api/v1/billing/webhooks/paddle` con los eventos `subscription.*`. Copiá la *secret key* a `PADDLE_WEBHOOK_SECRET`.
+  6. Cuando pruebes un pago en sandbox y veas el plan activo, cambiá a las credenciales de producción y `PADDLE_ENVIRONMENT=production`.
+- Con un medio de cobro listo, abrí el alta: `SIGNUP_ENABLED=true` y `docker compose up -d`.
+
+Los talleres que ya existían antes de esta versión tienen el plan Profesional bonificado. Para bonificar otro:
+
+```bash
+docker compose exec api dotnet RepairShop.Api.dll admin plan <email> Pro
+```
+
 ## Notas de seguridad
 
 - Solo el contenedor `web` publica un puerto, y solo en `127.0.0.1`: desde internet se llega únicamente a través del proxy con HTTPS.

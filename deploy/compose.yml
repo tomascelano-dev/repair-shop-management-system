@@ -68,6 +68,24 @@ services:
       Notifications__Meta__TemplateName: ${META_TEMPLATE_NAME:-}
       Ai__Provider: ${AI_PROVIDER:-None}
       Ai__Anthropic__ApiKey: ${ANTHROPIC_API_KEY:-}
+      # Suscripciones de los talleres: alta pública con prueba gratis y cobro mensual (ver README).
+      Billing__SignupEnabled: ${SIGNUP_ENABLED:-false}
+      Billing__TrialDays: ${TRIAL_DAYS:-14}
+      Billing__UsdPrices__Basic: ${PRICE_USD_BASIC:-25}
+      Billing__UsdPrices__Standard: ${PRICE_USD_STANDARD:-45}
+      Billing__UsdPrices__Pro: ${PRICE_USD_PRO:-79}
+      Billing__ArsPrices__Basic: ${PRICE_ARS_BASIC:-29900}
+      Billing__ArsPrices__Standard: ${PRICE_ARS_STANDARD:-44900}
+      Billing__ArsPrices__Pro: ${PRICE_ARS_PRO:-74900}
+      Billing__MercadoPago__AccessToken: ${MP_BILLING_ACCESS_TOKEN:-}
+      Billing__MercadoPago__WebhookSecret: ${MP_BILLING_WEBHOOK_SECRET:-}
+      Billing__Paddle__Environment: ${PADDLE_ENVIRONMENT:-sandbox}
+      Billing__Paddle__ApiKey: ${PADDLE_API_KEY:-}
+      Billing__Paddle__ClientToken: ${PADDLE_CLIENT_TOKEN:-}
+      Billing__Paddle__WebhookSecret: ${PADDLE_WEBHOOK_SECRET:-}
+      Billing__Paddle__PriceIds__Basic: ${PADDLE_PRICE_BASIC:-}
+      Billing__Paddle__PriceIds__Standard: ${PADDLE_PRICE_STANDARD:-}
+      Billing__Paddle__PriceIds__Pro: ${PADDLE_PRICE_PRO:-}
     volumes:
       # Fotos, firmas, logos y adjuntos de las órdenes.
       - app_data:/app/data/uploads

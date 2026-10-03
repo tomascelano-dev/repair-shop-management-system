@@ -135,6 +135,8 @@ jobs:
           Notifications__WhatsApp__Provider: Simulated
           Notifications__Email__Provider: Simulated
           Jobs__Enabled: "false"
+          # Plans are activated without charging (no payment provider in CI).
+          Billing__AllowSimulated: "true"
         run: |
           dotnet build src/RepairShop.Api/RepairShop.Api.csproj -c Release
           nohup dotnet src/RepairShop.Api/bin/Release/net8.0/RepairShop.Api.dll > "$RUNNER_TEMP/api.log" 2>&1 &
