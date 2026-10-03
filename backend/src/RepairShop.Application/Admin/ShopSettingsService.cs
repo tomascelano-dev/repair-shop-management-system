@@ -197,12 +197,18 @@ public sealed class ShopSettingsService
 
         if (req.CopyCatalog)
         {
-            var (items, _) = await _items.SearchAsync(currentShopId, new InventorySearchOptions(IncludeInactive: false, Take: 200), ct);
-            foreach (var i in items)
+            // Page through the whole catalog (the repository caps each page at 200 rows).
+            const int pageSize = 200;
+            for (var skip = 0; ; skip += pageSize)
             {
-                var copy = new InventoryItem(branch.Id, i.Sku, i.Name, 0, i.UnitCost, i.UnitCostCurrency, true, now);
-                copy.UpdateCatalog(i.Category, i.Barcode, i.MinStock, i.TrackStock, i.IsSellable, i.SalePrice, i.SalePriceCurrency, i.WarrantyDays, i.Location, now);
-                await _items.AddAsync(copy, ct);
+                var (items, _) = await _items.SearchAsync(currentShopId, new InventorySearchOptions(IncludeInactive: false, SortBy: "sku", Skip: skip, Take: pageSize), ct);
+                foreach (var i in items)
+                {
+                    var copy = new InventoryItem(branch.Id, i.Sku, i.Name, 0, i.UnitCost, i.UnitCostCurrency, true, now);
+                    copy.UpdateCatalog(i.Category, i.Barcode, i.MinStock, i.TrackStock, i.IsSellable, i.SalePrice, i.SalePriceCurrency, i.WarrantyDays, i.Location, now);
+                    await _items.AddAsync(copy, ct);
+                }
+                if (items.Count < pageSize) break;
             }
         }
 

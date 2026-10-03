@@ -88,7 +88,10 @@ public sealed class InventoryItemRepository : IInventoryItemRepository
         sortDir = (sortDir ?? "asc").Trim();
         var desc = sortDir.Equals("desc", StringComparison.OrdinalIgnoreCase);
 
-        return (sortBy.ToLowerInvariant(), desc) switch
+        // Tie-breaker by id keeps paging stable when names/stock repeat.
+        return Primary().ThenBy(x => x.Id);
+
+        IOrderedQueryable<InventoryItem> Primary() => (sortBy.ToLowerInvariant(), desc) switch
         {
             ("name", true) => q.OrderByDescending(x => x.Name),
             ("name", false) => q.OrderBy(x => x.Name),

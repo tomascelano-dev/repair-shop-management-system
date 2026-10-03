@@ -48,7 +48,7 @@ public sealed class AuthController : ControllerBase
 
     [HttpPost("refresh")]
     [AllowAnonymous]
-    [EnableRateLimiting(RateLimits.Auth)]
+    [EnableRateLimiting(RateLimits.Refresh)]
     public async Task<ActionResult<ApiResponse<LoginResponse>>> Refresh(CancellationToken ct)
     {
         RequireCsrfHeader();

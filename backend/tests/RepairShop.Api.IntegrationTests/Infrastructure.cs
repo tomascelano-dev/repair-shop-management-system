@@ -65,6 +65,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             ["Notifications__WhatsApp__Provider"] = "Simulated",
             ["Notifications__Email__Provider"] = "Simulated",
             ["RateLimiting__AuthPerMinute"] = "100000",
+            ["RateLimiting__RefreshPerMinute"] = "100000",
             ["RateLimiting__PublicPerMinute"] = "100000",
             ["App__PublicApiUrl"] = "http://localhost",
             ["App__FrontendBaseUrl"] = "http://localhost:5173",

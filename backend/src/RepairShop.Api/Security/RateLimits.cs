@@ -9,7 +9,12 @@ namespace RepairShop.Api.Security;
 /// </summary>
 public static class RateLimits
 {
+    /// <summary>Login, password reset and invitations: the brute-force targets.</summary>
     public const string Auth = "auth";
+
+    /// <summary>Session refresh: called on every page load and tab, guarded by an unguessable httpOnly cookie + CSRF header.</summary>
+    public const string Refresh = "refresh";
+
     public const string Public = "public";
     public const string Webhooks = "webhooks";
 
@@ -31,6 +36,7 @@ public static class RateLimits
         };
 
         Add(options, Auth, config.GetValue("RateLimiting:AuthPerMinute", 20));
+        Add(options, Refresh, config.GetValue("RateLimiting:RefreshPerMinute", 120));
         Add(options, Public, config.GetValue("RateLimiting:PublicPerMinute", 60));
         Add(options, Webhooks, config.GetValue("RateLimiting:WebhooksPerMinute", 300));
     }

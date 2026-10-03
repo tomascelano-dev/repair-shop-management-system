@@ -25,6 +25,7 @@ public sealed class OrderRecordsService
     private readonly IAuditLog _audit;
     private readonly IUnitOfWork _uow;
     private readonly IDateTimeProvider _clock;
+    private readonly IFileUrlSigner _urls;
 
     public OrderRecordsService(
         IRepairOrderRepository orders,
@@ -38,8 +39,10 @@ public sealed class OrderRecordsService
         FileService files,
         IAuditLog audit,
         IUnitOfWork uow,
-        IDateTimeProvider clock)
+        IDateTimeProvider clock,
+        IFileUrlSigner urls)
     {
+        _urls = urls;
         _orders = orders;
         _notes = notes;
         _attachments = attachments;
@@ -199,7 +202,9 @@ public sealed class OrderRecordsService
     private async Task<RepairOrderAttachmentResponse> ToResponseAsync(Guid shopId, RepairOrderAttachment a, CancellationToken ct)
     {
         StoredFile? file = a.FileId is null ? null : await _storedFiles.GetByIdAsync(shopId, a.FileId.Value, ct);
-        return new RepairOrderAttachmentResponse(a.Id, a.Url, a.Label, a.CreatedByUserId, a.CreatedAtUtc, a.Kind.ToString(), a.FileId,
+        // Files get a short-lived signed URL so they can be shown in <img> tags without the bearer token.
+        var url = a.FileId is null ? a.Url : _urls.GetUrl(a.FileId.Value, TimeSpan.FromMinutes(30));
+        return new RepairOrderAttachmentResponse(a.Id, url, a.Label, a.CreatedByUserId, a.CreatedAtUtc, a.Kind.ToString(), a.FileId,
             file?.FileName, file?.ContentType, file?.SizeBytes);
     }
 
