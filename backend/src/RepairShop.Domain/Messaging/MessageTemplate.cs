@@ -2,7 +2,7 @@ using RepairShop.Domain.Common;
 
 namespace RepairShop.Domain.Messaging;
 
-public sealed class MessageTemplate
+public sealed class MessageTemplate : IShopScoped
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid ShopId { get; private set; }
@@ -10,6 +10,7 @@ public sealed class MessageTemplate
     public string Key { get; private set; } = null!;
     public string Title { get; private set; } = null!;
     public string Body { get; private set; } = null!;
+
     public bool IsActive { get; private set; } = true;
 
     public DateTime CreatedAtUtc { get; private set; }
@@ -21,31 +22,35 @@ public sealed class MessageTemplate
     {
         ShopId = shopId;
         Key = NormalizeKey(key);
-        Title = (title ?? "").Trim();
-        Body = (body ?? "").Trim();
+        SetContent(title, body);
         IsActive = isActive;
         CreatedAtUtc = nowUtc;
         UpdatedAtUtc = nowUtc;
-
-        if (Title.Length < 2) throw new DomainException("Template title is required.");
-        if (Body.Length < 2) throw new DomainException("Template body is required.");
     }
 
     public void Update(string title, string body, bool isActive, DateTime nowUtc)
     {
-        Title = (title ?? "").Trim();
-        Body = (body ?? "").Trim();
+        SetContent(title, body);
         IsActive = isActive;
         UpdatedAtUtc = nowUtc;
+    }
 
-        if (Title.Length < 2) throw new DomainException("Template title is required.");
-        if (Body.Length < 2) throw new DomainException("Template body is required.");
+    private void SetContent(string title, string body)
+    {
+        Title = (title ?? "").Trim();
+        Body = (body ?? "").Trim();
+        if (Title.Length < 2) throw new DomainException("El título de la plantilla es obligatorio.");
+        if (Body.Length < 2) throw new DomainException("El texto de la plantilla es obligatorio.");
+        if (Title.Length > 120) throw new DomainException("El título de la plantilla es demasiado largo (máx. 120).");
+        if (Body.Length > 4000) throw new DomainException("El texto de la plantilla es demasiado largo (máx. 4000).");
     }
 
     private static string NormalizeKey(string key)
     {
         key = (key ?? "").Trim().ToLowerInvariant();
-        if (key.Length < 3) throw new DomainException("Template key is required.");
+        if (key.Length < 3) throw new DomainException("La clave de la plantilla es obligatoria.");
+        if (key.Length > 120 || key.Any(c => !(char.IsLetterOrDigit(c) || c is '.' or '_' or '-')))
+            throw new DomainException("La clave de la plantilla solo admite letras, números, '.', '_' y '-'.");
         return key;
     }
 }

@@ -47,7 +47,7 @@ public sealed class LoginSecurityService
             var retryAfter = (int)Math.Ceiling((entry.WindowEndUtc - now).TotalSeconds);
             retryAfter = Math.Max(1, retryAfter);
             throw new TooManyRequestsException(
-                "Too many login attempts from this IP. Please try again later.",
+                "Demasiados intentos de inicio de sesión. Probá de nuevo en unos minutos.",
                 retryAfter);
         }
     }
@@ -66,7 +66,7 @@ public sealed class LoginSecurityService
                 var retryAfter = (int)Math.Ceiling((until - now).TotalSeconds);
                 retryAfter = Math.Max(1, retryAfter);
                 throw new LockedException(
-                    "Account temporarily locked due to repeated invalid credentials. Please try again later.",
+                    "La cuenta quedó bloqueada temporalmente por varios intentos fallidos. Probá de nuevo más tarde.",
                     retryAfter);
             }
         }

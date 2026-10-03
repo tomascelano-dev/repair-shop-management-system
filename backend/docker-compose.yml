@@ -40,8 +40,16 @@ services:
       Database__Init: Migrate
       Database__ConnectRetries: "30"
       Database__ConnectDelayMs: "2000"
+      Storage__Provider: Local
+      Storage__Local__RootPath: /app/data/uploads
+      # The API sits behind the web container (nginx) on the compose network: trust its X-Forwarded-For.
+      ReverseProxy__KnownNetworks__0: 172.16.0.0/12
+      ReverseProxy__KnownNetworks__1: 192.168.0.0/16
+    volumes:
+      - repairshop_uploads:/app/data/uploads
     ports:
       - "8080:8080"
 
 volumes:
   repairshop_pgdata:
+  repairshop_uploads:

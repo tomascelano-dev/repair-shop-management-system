@@ -1,68 +1,48 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using RepairShop.Api.Common;
 using RepairShop.Api.Security;
 using RepairShop.Application.Abstractions;
+using RepairShop.Application.Admin;
+using RepairShop.Application.Common;
 using RepairShop.Application.Contracts;
-using RepairShop.Domain.RepairOrders;
-using RepairShop.Infrastructure.Persistence;
+using RepairShop.Application.Reports;
 
 namespace RepairShop.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/dashboard")]
-[Authorize(Policy = Policies.StaffOnly)]
+[Authorize]
 public sealed class DashboardController : ControllerBase
 {
+    private readonly DashboardService _dashboard;
+
+    public DashboardController(DashboardService dashboard) => _dashboard = dashboard;
+
+    /// <summary>Operational summary of the branch (computed in a few aggregated queries).</summary>
     [HttpGet("summary")]
-    public async Task<ActionResult<ApiResponse<DashboardSummaryResponse>>> Summary(
-        [FromServices] RepairShopDbContext db,
-        [FromServices] IDateTimeProvider clock,
-        CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<DashboardSummaryResponse>>> Summary(CancellationToken ct)
+        => Ok(Envelope.Ok(await _dashboard.GetSummaryAsync(CurrentUser.GetShopId(User), CurrentUser.GetUserId(User), ct)));
+
+    /// <summary>Daily revenue (orders + counter sales - refunds) converted to the reporting currency.</summary>
+    [HttpGet("revenue")]
+    [Authorize(Policy = Policies.Reports)]
+    public async Task<ActionResult<ApiResponse<List<RevenuePoint>>>> Revenue([FromQuery] int days = 30, CancellationToken ct = default)
+        => Ok(Envelope.Ok(await _dashboard.GetRevenueSeriesAsync(CurrentUser.GetShopId(User), Math.Clamp(days, 7, 366), ct)));
+
+    /// <summary>All branches the user can access, side by side (multi-sucursal).</summary>
+    [HttpGet("consolidated")]
+    [Authorize(Policy = Policies.Reports)]
+    public async Task<ActionResult<ApiResponse<ConsolidatedDashboardResponse>>> Consolidated(
+        [FromServices] ShopSettingsService settings, [FromServices] IShopRepository shops, CancellationToken ct)
     {
         var shopId = CurrentUser.GetShopId(User);
-        if (shopId == Guid.Empty) return Unauthorized();
+        var current = await shops.GetByIdAsync(shopId, ct) ?? throw new NotFoundException("Sucursal no encontrada.");
+        var branches = (await settings.ListBranchesAsync(shopId, CurrentUser.GetUserId(User), ct))
+            .Where(b => b.IsActive && b.MyRole is not null)
+            .Select(b => (b.Id, b.Name))
+            .ToList();
 
-        var orders = db.RepairOrders.Where(x => x.ShopId == shopId);
-
-        var totalOrders = await orders.CountAsync(ct);
-        var openOrders = await orders.CountAsync(x => x.Status != RepairOrderStatus.Delivered && x.Status != RepairOrderStatus.Cancelled, ct);
-        var readyOrders = await orders.CountAsync(x => x.Status == RepairOrderStatus.Ready, ct);
-        var deliveredOrders = await orders.CountAsync(x => x.Status == RepairOrderStatus.Delivered, ct);
-        var cancelledOrders = await orders.CountAsync(x => x.Status == RepairOrderStatus.Cancelled, ct);
-
-        var payments = db.RepairOrderPayments.Where(p => p.ShopId == shopId);
-        var paymentsByCurrency = await payments
-            .GroupBy(p => p.Currency)
-            .Select(g => new { Currency = g.Key, Total = g.Sum(x => x.Amount) })
-            .ToListAsync(ct);
-
-        string? currency = null;
-        decimal totalPayments = 0m;
-        if (paymentsByCurrency.Count == 1)
-        {
-            currency = paymentsByCurrency[0].Currency;
-            totalPayments = paymentsByCurrency[0].Total;
-        }
-        else if (paymentsByCurrency.Count > 1)
-        {
-            // Mixed currencies -> return null currency and 0 to avoid misleading totals
-            currency = null;
-            totalPayments = 0m;
-        }
-
-        var res = new DashboardSummaryResponse(
-            ShopId: shopId,
-            TotalOrders: totalOrders,
-            OpenOrders: openOrders,
-            ReadyOrders: readyOrders,
-            DeliveredOrders: deliveredOrders,
-            CancelledOrders: cancelledOrders,
-            TotalPaymentsAmount: decimal.Round(totalPayments, 2, MidpointRounding.AwayFromZero),
-            PaymentsCurrency: currency,
-            GeneratedAtUtc: clock.UtcNow);
-
-        return Ok(new ApiResponse<DashboardSummaryResponse>(res));
+        return Ok(Envelope.Ok(await _dashboard.GetConsolidatedAsync(branches, current.ReportingCurrency, ct)));
     }
 }

@@ -26,3 +26,28 @@ services:
 
       # Must NOT be "*" in prod
       AllowedHosts: ${ALLOWED_HOSTS}
+
+      # Public URLs (tracking links, QR codes, Mercado Pago webhooks)
+      App__FrontendBaseUrl: ${APP_FRONTEND_URL}
+      App__PublicApiUrl: ${APP_PUBLIC_API_URL}
+
+      # Encrypts the key ring that protects shop secrets (MP tokens, ARCA certificates). Keep it in your secret manager.
+      DataProtection__MasterKey: ${DATAPROTECTION_MASTERKEY}
+
+      # Optional integrations
+      Storage__Provider: ${STORAGE_PROVIDER:-Local}
+      Storage__S3__Bucket: ${STORAGE_S3_BUCKET:-}
+      Storage__S3__ServiceUrl: ${STORAGE_S3_SERVICE_URL:-}
+      Storage__S3__AccessKey: ${STORAGE_S3_ACCESS_KEY:-}
+      Storage__S3__SecretKey: ${STORAGE_S3_SECRET_KEY:-}
+      Notifications__WhatsApp__Provider: ${NOTIFICATIONS_WHATSAPP_PROVIDER:-None}
+      Notifications__Meta__PhoneNumberId: ${META_PHONE_NUMBER_ID:-}
+      Notifications__Meta__AccessToken: ${META_ACCESS_TOKEN:-}
+      Notifications__Meta__TemplateName: ${META_TEMPLATE_NAME:-}
+      Notifications__Email__Provider: ${NOTIFICATIONS_EMAIL_PROVIDER:-None}
+      Notifications__Smtp__Host: ${SMTP_HOST:-}
+      Notifications__Smtp__Username: ${SMTP_USERNAME:-}
+      Notifications__Smtp__Password: ${SMTP_PASSWORD:-}
+      Notifications__Smtp__FromAddress: ${SMTP_FROM:-}
+      Ai__Provider: ${AI_PROVIDER:-None}
+      Ai__Anthropic__ApiKey: ${ANTHROPIC_API_KEY:-}

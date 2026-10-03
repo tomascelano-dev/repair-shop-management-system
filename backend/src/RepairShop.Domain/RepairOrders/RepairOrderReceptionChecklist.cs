@@ -2,7 +2,7 @@ using RepairShop.Domain.Common;
 
 namespace RepairShop.Domain.RepairOrders;
 
-public sealed class RepairOrderReceptionChecklist
+public sealed class RepairOrderReceptionChecklist : IShopScoped
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
 
@@ -37,8 +37,8 @@ public sealed class RepairOrderReceptionChecklist
         UpdatedByUserId = updatedByUserId;
         UpdatedAtUtc = nowUtc;
 
-        if (RepairOrderId == Guid.Empty) throw new DomainException("Checklist must belong to an order.");
-        if (UpdatedByUserId == Guid.Empty) throw new DomainException("Checklist must have an updater user id.");
+        if (RepairOrderId == Guid.Empty) throw new DomainException("El checklist debe pertenecer a una orden.");
+        if (UpdatedByUserId == Guid.Empty) throw new DomainException("El checklist debe tener un usuario.");
     }
 
     public void Update(
@@ -55,8 +55,8 @@ public sealed class RepairOrderReceptionChecklist
         Guid updatedByUserId,
         DateTime nowUtc)
     {
-        if (updatedByUserId == Guid.Empty) throw new DomainException("Checklist must have an updater user id.");
-        if (batteryPercent is < 0 or > 100) throw new DomainException("Battery percent must be 0-100.");
+        if (updatedByUserId == Guid.Empty) throw new DomainException("El checklist debe tener un usuario.");
+        if (batteryPercent is < 0 or > 100) throw new DomainException("El porcentaje de batería debe estar entre 0 y 100.");
 
         ScreenOk = screenOk;
         CamerasOk = camerasOk;

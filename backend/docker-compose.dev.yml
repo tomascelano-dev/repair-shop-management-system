@@ -11,6 +11,12 @@ services:
       Jwt__Key: DEV_CHANGE_ME_RepairShop_SuperSecretKey_1234567890
       Swagger__Enabled: "true"
       Seed__Enabled: "true"
+      Seed__DemoData: "true"
+      App__FrontendBaseUrl: http://localhost:5173
+      App__PublicApiUrl: http://localhost:8080
+      # Messages are logged instead of sent (set Twilio/Meta/Smtp providers to send for real).
+      Notifications__WhatsApp__Provider: Simulated
+      Notifications__Email__Provider: Simulated
       Cors__AllowedOrigins__0: http://localhost:5173
       Cors__AllowedOrigins__1: http://localhost:8080
       AllowedHosts: localhost;127.0.0.1

@@ -1,10 +1,10 @@
-using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using RepairShop.Application.Common;
 using RepairShop.Domain.Common;
 
 namespace RepairShop.Api.Common;
 
+/// <summary>Maps exceptions to RFC 7807 responses with Spanish, user-facing messages.</summary>
 public sealed class ProblemDetailsMiddleware : IMiddleware
 {
     private readonly ILogger<ProblemDetailsMiddleware> _logger;
@@ -22,38 +22,34 @@ public sealed class ProblemDetailsMiddleware : IMiddleware
         {
             await next(context);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            // Client went away: nothing to answer, nothing to log as an error.
+            if (!context.Response.HasStarted) context.Response.StatusCode = 499;
+        }
         catch (Exception ex)
         {
-            // Always log the server-side exception (incl. stack trace) so prod failures are debuggable.
-            var corrForLog = CorrelationIdMiddleware.TryGet(context);
-            _logger.LogError(ex,
-                "Unhandled exception for {Method} {Path}. CorrelationId={CorrelationId}",
-                context.Request.Method,
-                context.Request.Path.Value,
-                corrForLog);
+            var (status, title, expose) = Map(ex);
+            var correlationId = CorrelationIdMiddleware.TryGet(context);
 
-            var (statusCode, title) = ex switch
-            {
-                DomainException => ((int)HttpStatusCode.BadRequest, "Domain validation error"),
-                NotFoundException => ((int)HttpStatusCode.NotFound, "Resource not found"),
-                UnauthorizedException => ((int)HttpStatusCode.Unauthorized, "Unauthorized"),
-                LockedException => (StatusCodes.Status423Locked, "Locked"),
-                TooManyRequestsException => (StatusCodes.Status429TooManyRequests, "Too Many Requests"),
-                _ => ((int)HttpStatusCode.InternalServerError, "Unexpected error")
-            };
+            if (status >= 500)
+                _logger.LogError(ex, "Unhandled exception for {Method} {Path}. CorrelationId={CorrelationId}", context.Request.Method, context.Request.Path.Value, correlationId);
+            else
+                _logger.LogInformation("Request {Method} {Path} failed with {Status}: {Message}", context.Request.Method, context.Request.Path.Value, status, ex.Message);
+
+            if (context.Response.HasStarted) throw;
 
             var problem = new ProblemDetails
             {
-                Status = statusCode,
+                Status = status,
                 Title = title,
-                Detail = _env.IsDevelopment() ? ex.ToString() : ex.Message,
-                Instance = context.Request.Path
+                Detail = expose ? ex.Message : _env.IsDevelopment() ? ex.ToString() : "Ocurrió un error inesperado. Si persiste, informá el código de seguimiento.",
+                Instance = context.Request.Path,
+                Type = $"https://httpstatuses.com/{status}"
             };
 
-            // RFC7807 extensions
             problem.Extensions["traceId"] = context.TraceIdentifier;
-            var corr = CorrelationIdMiddleware.TryGet(context);
-            if (!string.IsNullOrWhiteSpace(corr)) problem.Extensions["correlationId"] = corr;
+            if (!string.IsNullOrWhiteSpace(correlationId)) problem.Extensions["correlationId"] = correlationId;
 
             if (ex is RetryAfterException ra)
             {
@@ -61,12 +57,23 @@ public sealed class ProblemDetailsMiddleware : IMiddleware
                 problem.Extensions["retryAfterSeconds"] = ra.RetryAfterSeconds;
             }
 
-            // A simple stable "type" URI (keeps it standard without leaking internals)
-            problem.Type = $"https://httpstatuses.com/{problem.Status}";
-
-            context.Response.StatusCode = problem.Status.Value;
+            context.Response.Clear();
+            context.Response.StatusCode = status;
             context.Response.ContentType = "application/problem+json";
             await context.Response.WriteAsJsonAsync(problem);
         }
     }
+
+    private static (int Status, string Title, bool Expose) Map(Exception ex) => ex switch
+    {
+        DomainException => (StatusCodes.Status400BadRequest, "Datos inválidos", true),
+        BadHttpRequestException b => (b.StatusCode, "Solicitud inválida", true),
+        NotFoundException => (StatusCodes.Status404NotFound, "No encontrado", true),
+        UnauthorizedException => (StatusCodes.Status401Unauthorized, "No autorizado", true),
+        ForbiddenException => (StatusCodes.Status403Forbidden, "Sin permiso", true),
+        ConflictException => (StatusCodes.Status409Conflict, "Conflicto", true),
+        LockedException => (StatusCodes.Status423Locked, "Bloqueado", true),
+        TooManyRequestsException => (StatusCodes.Status429TooManyRequests, "Demasiados intentos", true),
+        _ => (StatusCodes.Status500InternalServerError, "Error inesperado", false)
+    };
 }

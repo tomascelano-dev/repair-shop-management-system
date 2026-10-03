@@ -11,7 +11,10 @@ public sealed record DeviceResponse(
     string? Label,
     string? SerialNumber,
     string? Notes,
-    DateTime CreatedAtUtc
+    DateTime CreatedAtUtc,
+    string? Imei = null,
+    DateTime? UpdatedAtUtc = null,
+    string? CustomerName = null
 );
 
 public sealed record DeviceCreateRequest(
@@ -20,7 +23,8 @@ public sealed record DeviceCreateRequest(
     [Required, MinLength(2)] string Model,
     string? Label,
     string? SerialNumber,
-    string? Notes
+    string? Notes,
+    string? Imei = null
 );
 
 public sealed record DeviceUpdateRequest(
@@ -28,5 +32,6 @@ public sealed record DeviceUpdateRequest(
     [Required, MinLength(2)] string Model,
     string? Label,
     string? SerialNumber,
-    string? Notes
+    string? Notes,
+    string? Imei = null
 );
