@@ -27,15 +27,22 @@ export function PublicHeader() {
 }
 
 export function PublicFooter() {
+  const links = [
+    { to: '/precios', label: 'Precios' },
+    { to: '/terminos', label: 'Términos' },
+    { to: '/privacidad', label: 'Privacidad' },
+    { to: '/reembolsos', label: 'Reembolsos' },
+  ]
   return (
     <footer className="mx-auto max-w-6xl px-4 py-8 text-center text-xs text-slate-500">
-      <Link to="/terminos" className="hover:underline">
-        Términos
-      </Link>
-      {' · '}
-      <Link to="/privacidad" className="hover:underline">
-        Privacidad
-      </Link>
+      {links.map((l, i) => (
+        <span key={l.to}>
+          {i > 0 && ' · '}
+          <Link to={l.to} className="hover:underline">
+            {l.label}
+          </Link>
+        </span>
+      ))}
     </footer>
   )
 }
@@ -96,7 +103,11 @@ export function PricingPage() {
             {country === 'AR'
               ? 'Precios finales en pesos, cobrados por Mercado Pago cada mes.'
               : 'Precios en dólares por mes. Paddle cobra el abono y suma los impuestos que correspondan en tu país.'}{' '}
-            Cancelás cuando quieras.
+            Cancelás cuando quieras, y si no te sirve te devolvemos el primer pago dentro de los 14 días (
+            <Link to="/reembolsos" className="underline">
+              política de reembolsos
+            </Link>
+            ).
           </p>
         </section>
       </main>

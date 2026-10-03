@@ -33,7 +33,7 @@ public sealed class BillingController : ControllerBase
     public ActionResult<ApiResponse<PlansResponse>> PlansList([FromQuery] string? country)
         => Ok(Envelope.Ok(_subscriptions.ListPlans(country)));
 
-    /// <summary>Public settings the web app needs before signing in (signup switch, Paddle.js token).</summary>
+    /// <summary>Public settings the web app needs before signing in (signup switch, Paddle.js token, legal contact).</summary>
     [HttpGet("config")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimits.Public)]
@@ -44,7 +44,9 @@ public sealed class BillingController : ControllerBase
             o.SignupEnabled,
             o.TrialDays,
             o.Paddle.IsConfigured ? o.Paddle.ClientToken : null,
-            o.Paddle.IsProduction ? "production" : "sandbox")));
+            o.Paddle.IsProduction ? "production" : "sandbox",
+            string.IsNullOrWhiteSpace(o.ContactEmail) ? null : o.ContactEmail.Trim(),
+            string.IsNullOrWhiteSpace(o.LegalName) ? null : o.LegalName.Trim())));
     }
 
     [HttpGet("subscription")]
@@ -102,4 +104,5 @@ public sealed class BillingController : ControllerBase
     }
 }
 
-public sealed record BillingConfigResponse(bool SignupEnabled, int TrialDays, string? PaddleClientToken, string PaddleEnvironment);
+public sealed record BillingConfigResponse(
+    bool SignupEnabled, int TrialDays, string? PaddleClientToken, string PaddleEnvironment, string? ContactEmail, string? LegalName);
