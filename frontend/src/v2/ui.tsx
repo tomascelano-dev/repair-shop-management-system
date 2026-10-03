@@ -156,3 +156,42 @@ export function ErrorBox({ message }: { message: string }) {
     </div>
   ) : null;
 }
+
+// Small dropdown for secondary actions; closes on outside click, Escape or after picking an item.
+export function MenuButton({
+  label,
+  children,
+}: {
+  label: ReactNode;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (e: Event) => {
+      if (
+        ref.current?.open &&
+        (e instanceof KeyboardEvent
+          ? e.key === "Escape"
+          : !ref.current.contains(e.target as Node))
+      )
+        ref.current.open = false;
+    };
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("click", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, []);
+  return (
+    <details className="menu-button" ref={ref}>
+      <summary className="button secondary small">{label}</summary>
+      <div
+        className="menu-list"
+        onClick={() => ref.current && (ref.current.open = false)}
+      >
+        {children}
+      </div>
+    </details>
+  );
+}

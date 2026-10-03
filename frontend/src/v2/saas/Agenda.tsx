@@ -222,8 +222,7 @@ export default function Agenda() {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">AGENDA</span>
-          <h1>Turnos y visitas</h1>
+          <h1>Agenda</h1>
           <p>
             Turnos del taller, servicios a domicilio y mantenimientos
             preventivos.

@@ -8,11 +8,15 @@ import {
   Smartphone,
   Building2,
   ArrowUpRight,
+  ArrowLeft,
+  Lock,
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { request, USER_KEY } from "../api";
 import { ErrorBox, Loading } from "../ui";
+import { useSession } from "../saas/session";
+import { UpgradeNotice } from "../saas/Settings";
 import {
   PremiumContext,
   Editor,
@@ -101,6 +105,8 @@ export default function Premium() {
     }
   }
   const info = modules.find((m) => m.id === module);
+  const { has } = useSession();
+  if (info && !has(info.id)) return <UpgradeNotice module={info.name} />;
   if (!d)
     return (
       <>
@@ -128,18 +134,18 @@ export default function Premium() {
       }}
     >
       <div className="premium-page">
+        {info && (
+          <Link to="/premium" className="back-link">
+            <ArrowLeft size={15} />
+            Módulos
+          </Link>
+        )}
         <div className="page-heading">
           <div>
-            <Link to="/premium" className="eyebrow">
-              MÓDULOS PREMIUM
-            </Link>
-            <h1>
-              {info?.name || "Más control sobre tu negocio"}
-              <span className="accent">.</span>
-            </h1>
+            <h1>{info?.name || "Módulos"}</h1>
             <p>
               {info?.description ||
-                "Comprá mejor, cuidá tus márgenes y hacé crecer la operación."}
+                "Herramientas para comprar mejor, cuidar el stock y medir la rentabilidad."}
             </p>
           </div>
           <button
@@ -172,22 +178,12 @@ export default function Premium() {
         )}
         {!info && (
           <>
-            <div className="premium-welcome">
-              <span className="live-dot" />
-              <div>
-                <strong>Herramientas para hacer crecer el taller</strong>
-                <p>
-                  Cada módulo trabaja con tus órdenes, clientes y stock en
-                  tiempo real.
-                </p>
-              </div>
-            </div>
             <div className="module-grid">
               {modules.map((m) => (
                 <Link
                   key={m.id}
-                  to={`/premium/${m.id}`}
-                  className="module-card"
+                  to={has(m.id) ? `/premium/${m.id}` : "/settings/plan"}
+                  className={`module-card ${has(m.id) ? "" : "locked"}`}
                 >
                   <span className={`stat-icon ${m.color}`}>
                     <m.icon size={24} />
@@ -195,19 +191,17 @@ export default function Premium() {
                   <h2>{m.name}</h2>
                   <p>{m.description}</p>
                   <div>
-                    <span>Abrir módulo</span>
-                    <ArrowUpRight size={19} />
+                    <span>
+                      {has(m.id) ? "Abrir módulo" : "Disponible en otro plan"}
+                    </span>
+                    {has(m.id) ? (
+                      <ArrowUpRight size={19} />
+                    ) : (
+                      <Lock size={17} />
+                    )}
                   </div>
                 </Link>
               ))}
-            </div>
-            <div className="premium-journey">
-              <strong>Probá el circuito completo</strong>
-              <p>
-                Recibí un repuesto en Compras, reservalo para una orden en Stock
-                y consumilo cuando lo instales. Después registrá el tiempo de
-                trabajo y revisá el resultado en Rentabilidad.
-              </p>
             </div>
           </>
         )}

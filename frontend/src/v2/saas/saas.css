@@ -1330,3 +1330,13 @@ a.local-card {
   color: inherit;
   text-decoration: underline;
 }
+
+.advanced > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--teal);
+  font-weight: 600;
+}
+.advanced[open] > summary {
+  margin-bottom: 10px;
+}

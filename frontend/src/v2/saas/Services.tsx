@@ -103,7 +103,6 @@ export default function Services() {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">CATÁLOGO</span>
           <h1>Servicios y precios</h1>
           <p>
             Tu lista de reparaciones con precio, costo, tiempo y garantía. Se

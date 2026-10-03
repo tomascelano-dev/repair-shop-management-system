@@ -184,8 +184,7 @@ export default function Invoices() {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">FACTURACIÓN</span>
-          <h1>Comprobantes emitidos</h1>
+          <h1>Facturación</h1>
           <p>
             Facturas y notas de crédito electrónicas con CAE. Emitilas desde una
             orden o una venta.

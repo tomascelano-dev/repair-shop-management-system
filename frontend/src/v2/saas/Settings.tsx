@@ -42,8 +42,7 @@ export default function Settings() {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">CONFIGURACIÓN</span>
-          <h1>Tu taller y tu cuenta</h1>
+          <h1>Configuración</h1>
           <p>Datos del comercio, equipo, plan, ARCA e integraciones.</p>
         </div>
       </div>
@@ -316,8 +315,8 @@ export function ShopTab({ onSaved }: { onSaved?: () => void }) {
               label="Seguimiento de reparaciones"
               url={`${origin}/seguimiento/${p.slug}`}
             />
-            <div className="field">
-              <span>Widget de seguimiento para tu sitio web</span>
+            <details className="field advanced">
+              <summary>Mostrar el seguimiento en tu sitio web</summary>
               <pre className="code-box">{widget}</pre>
               <button
                 type="button"
@@ -327,7 +326,7 @@ export function ShopTab({ onSaved }: { onSaved?: () => void }) {
                 <Copy size={14} />
                 Copiar código
               </button>
-            </div>
+            </details>
           </div>
         </Section>
         <Section

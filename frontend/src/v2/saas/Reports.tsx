@@ -41,8 +41,7 @@ export default function Reports() {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">REPORTES</span>
-          <h1>Cómo viene el taller</h1>
+          <h1>Reportes</h1>
           <p>
             Órdenes, cobros, ventas, facturación, satisfacción y productividad.
           </p>

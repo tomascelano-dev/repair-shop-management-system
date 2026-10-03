@@ -37,9 +37,6 @@ export default function Catalog({ type }: { type: "customers" | "inventory" }) {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">
-            {stock ? "REPUESTOS Y MATERIALES" : "PERSONAS QUE CONFÍAN EN VOS"}
-          </span>
           <h1>{stock ? "Inventario" : "Clientes"}</h1>
           <p>
             {stock

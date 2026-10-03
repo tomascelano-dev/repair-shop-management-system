@@ -181,8 +181,10 @@ export function SubscriptionBanner() {
     );
   if (s.status === "Trialing") {
     const left = daysLeft(s.trialEndsAtUtc);
+    // The sidebar already shows the trial; the banner only appears near the end.
+    if (left > 3) return null;
     return (
-      <div className={`sub-banner ${left <= 3 ? "warn" : ""}`}>
+      <div className="sub-banner warn">
         <span>
           Prueba gratis del plan {planNames[s.plan] || s.plan}:{" "}
           {left === 1 ? "queda 1 día" : `quedan ${left} días`}.

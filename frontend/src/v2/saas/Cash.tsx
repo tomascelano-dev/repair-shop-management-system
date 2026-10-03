@@ -32,8 +32,7 @@ export default function Cash() {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">CAJA Y MOSTRADOR</span>
-          <h1>Caja del día</h1>
+          <h1>Caja</h1>
           <p>
             Apertura y cierre, ventas de mostrador, cobros de órdenes y cuentas
             corrientes.

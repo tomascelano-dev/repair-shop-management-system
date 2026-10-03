@@ -148,7 +148,6 @@ export default function Tech() {
     <div className="tech-app">
       <div className="page-heading">
         <div>
-          <span className="eyebrow">APP DEL TÉCNICO</span>
           <h1>Mi trabajo</h1>
           <p>
             Tus órdenes, tiempos y visitas. Instalala en el celular desde el

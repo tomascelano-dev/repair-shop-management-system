@@ -3,10 +3,10 @@
 }
 .sidebar .premium-nav-caption {
   display: block;
-  margin: 22px 12px 10px;
+  margin: 18px 12px 8px;
 }
 .sidebar nav a {
-  min-height: 40px;
+  min-height: 38px;
 }
 .premium-page {
   display: flex;
@@ -303,7 +303,7 @@
   color: var(--muted);
   font-size: 12px;
   margin: 12px 0 25px;
-  min-height: 40px;
+  min-height: 38px;
 }
 .module-card > div {
   border-top: 1px solid var(--border);
@@ -526,4 +526,7 @@
   .premium-tabs {
     overflow: auto;
   }
+}
+.module-card.locked {
+  opacity: 0.7;
 }

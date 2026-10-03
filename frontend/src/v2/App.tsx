@@ -16,7 +16,6 @@ import {
   Plus,
   Search,
   LogOut,
-  ArrowUpRight,
   ArrowRight,
   Clock3,
   CheckCircle2,
@@ -27,8 +26,6 @@ import {
   Menu,
   X,
   SlidersHorizontal,
-  RefreshCw,
-  ShieldCheck,
   Wallet,
   ReceiptText,
   CalendarDays,
@@ -38,7 +35,7 @@ import {
   Settings as SettingsIcon,
   Lock,
 } from "lucide-react";
-import { Toaster, toast } from "sonner";
+import { Toaster } from "sonner";
 import {
   request,
   TOKEN_KEY,
@@ -56,13 +53,7 @@ import OrderDetail from "./OrderDetail";
 import Portal from "./Portal";
 import Catalog from "./Catalog";
 import Premium, { modules } from "./premium/Premium";
-import {
-  SessionContext,
-  type Me,
-  planNames,
-  subscriptionNames,
-  daysLeft,
-} from "./saas/session";
+import { SessionContext, type Me, planNames, daysLeft } from "./saas/session";
 import { Tracking, Booking, Survey, Signup } from "./saas/Public";
 import Settings, { SimulatedCheckout } from "./saas/Settings";
 import { Privacy, Terms } from "./saas/Legal";
@@ -78,35 +69,57 @@ import "./v2.css";
 import "./saas/saas.css";
 
 const operations = [
-  {
-    to: "/agenda",
-    name: "Agenda y turnos",
-    icon: CalendarDays,
-    module: "agenda",
-  },
-  { to: "/cash", name: "Caja y mostrador", icon: Wallet, module: "cash" },
+  { to: "/agenda", name: "Agenda", icon: CalendarDays, module: "agenda" },
+  { to: "/cash", name: "Caja", icon: Wallet, module: "cash" },
   {
     to: "/invoices",
     name: "Facturación",
     icon: ReceiptText,
     module: "invoicing",
   },
+];
+const business = [
   {
     to: "/services",
     name: "Servicios y precios",
     icon: ClipboardList,
     module: "catalog",
   },
-  { to: "/tech", name: "App del técnico", icon: HardHat, module: "technician" },
   { to: "/reports", name: "Reportes", icon: BarChart3, module: "" },
+  { to: "/tech", name: "App del técnico", icon: HardHat, module: "technician" },
 ];
 const adminOnly = ["/cash", "/invoices"];
+
+function ModuleLink({
+  to,
+  name,
+  icon: Icon,
+  unlocked,
+}: {
+  to: string;
+  name: string;
+  icon: typeof Wrench;
+  unlocked: boolean;
+}) {
+  return (
+    <NavLink
+      to={unlocked ? to : "/settings/plan"}
+      className={({ isActive }) =>
+        unlocked ? (isActive ? "active" : "") : "locked"
+      }
+    >
+      <Icon size={18} />
+      {name}
+      {!unlocked && <Lock size={13} className="nav-lock" />}
+    </NavLink>
+  );
+}
 const titles: [string, string][] = [
   ["/orders/", "Detalle de orden"],
-  ["/orders", "Órdenes de trabajo"],
+  ["/orders", "Órdenes"],
   ["/customers", "Clientes"],
-  ["/agenda", "Agenda y turnos"],
-  ["/cash", "Caja y mostrador"],
+  ["/agenda", "Agenda"],
+  ["/cash", "Caja"],
   ["/invoices", "Facturación"],
   ["/services", "Servicios y precios"],
   ["/tech", "App del técnico"],
@@ -263,21 +276,23 @@ export default function App() {
               <strong>{shopName}</strong>
               <small>
                 {sub
-                  ? `Plan ${planNames[sub.plan] || sub.plan}`
+                  ? sub.status === "Trialing"
+                    ? `Prueba · ${daysLeft(sub.trialEndsAtUtc)} días`
+                    : `Plan ${planNames[sub.plan] || sub.plan}`
                   : "Espacio de trabajo"}
               </small>
             </div>
             <ChevronRight size={14} />
           </Link>
-          <small className="nav-caption">OPERACIÓN</small>
+          <small className="nav-caption">TALLER</small>
           <nav onClick={() => setMobile(false)}>
             <NavLink to="/" end>
               <LayoutDashboard size={19} />
-              Vista general
+              Inicio
             </NavLink>
             <NavLink to="/orders">
               <Wrench size={19} />
-              Órdenes de trabajo<span className="nav-count">{open}</span>
+              Órdenes<span className="nav-count">{open}</span>
             </NavLink>
             <NavLink to="/customers">
               <Users size={19} />
@@ -286,38 +301,18 @@ export default function App() {
             {operations
               .filter((m) => admin || !adminOnly.includes(m.to))
               .map((m) => (
-                <NavLink
-                  key={m.to}
-                  to={has(m.module) ? m.to : "/settings/plan"}
-                  className={({ isActive }) =>
-                    has(m.module) ? (isActive ? "active" : "") : "locked"
-                  }
-                >
-                  <m.icon size={18} />
-                  {m.name}
-                  {!has(m.module) && <Lock size={13} className="nav-lock" />}
-                </NavLink>
+                <ModuleLink key={m.to} {...m} unlocked={has(m.module)} />
               ))}
-            <small className="nav-caption premium-nav-caption">
-              GESTIÓN DEL NEGOCIO
-            </small>
-            <NavLink to="/premium" end>
+            <small className="nav-caption premium-nav-caption">NEGOCIO</small>
+            {business
+              .filter((m) => admin || !adminOnly.includes(m.to))
+              .map((m) => (
+                <ModuleLink key={m.to} {...m} unlocked={has(m.module)} />
+              ))}
+            <NavLink to="/premium">
               <Boxes size={18} />
-              Resumen de módulos
+              Módulos
             </NavLink>
-            {modules.map((m) => (
-              <NavLink
-                key={m.id}
-                to={has(m.id) ? `/premium/${m.id}` : "/settings/plan"}
-                className={({ isActive }) =>
-                  has(m.id) ? (isActive ? "active" : "") : "locked"
-                }
-              >
-                <m.icon size={18} />
-                {m.name}
-                {!has(m.id) && <Lock size={13} className="nav-lock" />}
-              </NavLink>
-            ))}
             <small className="nav-caption premium-nav-caption">CUENTA</small>
             <NavLink to="/settings">
               <SettingsIcon size={18} />
@@ -325,26 +320,6 @@ export default function App() {
             </NavLink>
           </nav>
           <div className="sidebar-bottom">
-            {sub && (
-              <Link
-                to="/settings/plan"
-                className="local-card"
-                onClick={() => setMobile(false)}
-              >
-                <span className="live-dot" />
-                <strong>
-                  Plan {planNames[sub.plan] || sub.plan} ·{" "}
-                  {subscriptionNames[sub.status] || sub.status}
-                </strong>
-                <p>
-                  {sub.status === "Trialing"
-                    ? `Te quedan ${daysLeft(sub.trialEndsAtUtc)} días de prueba con todos los módulos.`
-                    : sub.readOnly
-                      ? "Cuenta en modo solo lectura."
-                      : "Ver plan, pagos y módulos incluidos."}
-                </p>
-              </Link>
-            )}
             <div className="user-card">
               <span className="avatar">
                 {(user.displayName || "A").slice(0, 1)}
@@ -382,23 +357,15 @@ export default function App() {
               >
                 <Menu />
               </button>
-              <span>{shopName}</span>
-              <ChevronRight size={14} />
               <strong>
                 {titles.find(([p]) => location.pathname.startsWith(p))?.[1] ||
                   (location.pathname.startsWith("/premium")
                     ? modules.find((m) => location.pathname.endsWith(m.id))
-                        ?.name || "Módulos premium"
-                    : "Vista general")}
+                        ?.name || "Módulos"
+                    : "Inicio")}
               </strong>
             </div>
             <div className="topbar-right">
-              <span className="today">
-                {new Date().toLocaleDateString("es-AR", {
-                  day: "numeric",
-                  month: "long",
-                })}
-              </span>
               <AlertsBell />
               <button
                 className="button primary small"
@@ -416,23 +383,11 @@ export default function App() {
             <Routes>
               <Route
                 path="/"
-                element={
-                  busy ? (
-                    <Loading />
-                  ) : (
-                    <Dashboard data={data} onNew={() => setIntake(true)} />
-                  )
-                }
+                element={busy ? <Loading /> : <Dashboard data={data} />}
               />
               <Route
                 path="/orders"
-                element={
-                  busy ? (
-                    <Loading />
-                  ) : (
-                    <Orders data={data} onNew={() => setIntake(true)} />
-                  )
-                }
+                element={busy ? <Loading /> : <Orders data={data} />}
               />
               <Route
                 path="/orders/:id"
@@ -456,29 +411,8 @@ export default function App() {
                 element={<Navigate to="/settings/taller" replace />}
               />
               <Route path="/settings/:tab" element={<Settings />} />
-              <Route
-                path="*"
-                element={
-                  <Dashboard data={data} onNew={() => setIntake(true)} />
-                }
-              />
+              <Route path="*" element={<Dashboard data={data} />} />
             </Routes>
-            <footer className="page-footer">
-              <span>RepairShop</span>
-              <span>
-                <ShieldCheck size={13} />
-                Tus datos, con copias de seguridad diarias
-              </span>
-              <button
-                onClick={() => {
-                  load();
-                  toast.success("Datos actualizados");
-                }}
-              >
-                <RefreshCw size={12} />
-                Actualizar
-              </button>
-            </footer>
           </main>
         </div>
         {intake && <Intake onClose={() => setIntake(false)} onCreated={load} />}
@@ -593,7 +527,7 @@ function Login({ onLogin }: { onLogin: () => void }) {
   );
 }
 
-function Dashboard({ data, onNew }: { data: BoardData; onNew: () => void }) {
+function Dashboard({ data }: { data: BoardData }) {
   const active = data.orders.filter(
     (o) => !["Delivered", "Cancelled"].includes(o.status),
   );
@@ -611,28 +545,28 @@ function Dashboard({ data, onNew }: { data: BoardData; onNew: () => void }) {
     {
       label: "Órdenes abiertas",
       value: active.length,
-      sub: "Equipos en proceso",
+      to: "/orders",
       Icon: Wrench,
       color: "blue",
     },
     {
       label: "Por aprobar",
       value: pending.length,
-      sub: "Esperando a tu cliente",
+      to: "/orders?status=AwaitingApproval",
       Icon: Clock3,
       color: "amber",
     },
     {
       label: "Listos para retirar",
       value: ready.length,
-      sub: "Reparación finalizada",
+      to: "/orders?status=Ready",
       Icon: CheckCircle2,
       color: "green",
     },
     {
-      label: "Cobrado neto · ARS",
+      label: "Cobrado",
       value: money(ars),
-      sub: "Cobros menos devoluciones · total",
+      to: "/reports",
       Icon: CircleDollarSign,
       color: "purple",
     },
@@ -641,20 +575,12 @@ function Dashboard({ data, onNew }: { data: BoardData; onNew: () => void }) {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">VISTA GENERAL</span>
-          <h1>
-            El taller, en orden<span className="accent">.</span>
-          </h1>
-          <p>Esto es lo que está pasando con tus reparaciones.</p>
+          <h1>Inicio</h1>
         </div>
-        <button className="button secondary" onClick={onNew}>
-          <Plus size={18} />
-          Recibir un equipo
-        </button>
       </div>
       <div className="stats-grid">
         {stats.map((s) => (
-          <div className="stat-card" key={s.label}>
+          <Link className="stat-card" key={s.label} to={s.to}>
             <div>
               <span>{s.label}</span>
               <span className={`stat-icon ${s.color}`}>
@@ -662,16 +588,14 @@ function Dashboard({ data, onNew }: { data: BoardData; onNew: () => void }) {
               </span>
             </div>
             <strong>{s.value}</strong>
-            <small>{s.sub}</small>
-          </div>
+          </Link>
         ))}
       </div>
       <div className="dashboard-split">
         <section className="panel flow-panel">
           <div className="panel-heading">
             <div>
-              <h3>Flujo del taller</h3>
-              <p>Distribución de las órdenes abiertas</p>
+              <h3>Órdenes por estado</h3>
             </div>
             <span className="soft-label">{active.length} en curso</span>
           </div>
@@ -703,34 +627,11 @@ function Dashboard({ data, onNew }: { data: BoardData; onNew: () => void }) {
             })}
           </div>
         </section>
-        <section className="attention-panel">
-          <div className="attention-symbol">
-            <Clock3 size={24} />
-          </div>
-          <h3>El próximo paso cuenta.</h3>
-          <p>
-            {pending.length
-              ? `Tenés ${pending.length} presupuesto${pending.length > 1 ? "s" : ""} esperando respuesta. Compartí el enlace para que el cliente confirme.`
-              : "Tus presupuestos están al día. Revisá el tablero y elegí el próximo equipo."}
-          </p>
-          <Link to="/orders?status=AwaitingApproval">
-            Ver presupuestos pendientes
-            <ArrowUpRight size={18} />
-          </Link>
-          <div className="attention-bottom">
-            <CheckCircle2 size={17} />
-            <span>
-              {ready.length} equipo{ready.length !== 1 ? "s" : ""} listo
-              {ready.length !== 1 ? "s" : ""} para retirar
-            </span>
-          </div>
-        </section>
       </div>
       <section className="panel">
         <div className="panel-heading">
           <div>
             <h3>Últimas órdenes</h3>
-            <p>Lo más reciente de tu mesa de trabajo</p>
           </div>
           <Link className="text-link" to="/orders">
             Ver todas
@@ -820,7 +721,7 @@ export function OrderTable({
   );
 }
 
-function Orders({ data, onNew }: { data: BoardData; onNew: () => void }) {
+function Orders({ data }: { data: BoardData }) {
   const location = useLocation();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(
@@ -841,14 +742,8 @@ function Orders({ data, onNew }: { data: BoardData; onNew: () => void }) {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">TU MESA DE TRABAJO</span>
-          <h1>Órdenes de trabajo</h1>
-          <p>Cada reparación, desde el ingreso hasta la entrega.</p>
+          <h1>Órdenes</h1>
         </div>
-        <button className="button primary" onClick={onNew}>
-          <Plus size={18} />
-          Nueva recepción
-        </button>
       </div>
       <div className="toolbar">
         <div className="search-input">
