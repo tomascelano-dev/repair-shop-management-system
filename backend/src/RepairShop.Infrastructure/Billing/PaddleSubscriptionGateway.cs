@@ -19,6 +19,7 @@ namespace RepairShop.Infrastructure.Billing;
 public sealed class PaddleSubscriptionGateway : IPaddleSubscriptionGateway
 {
     public const string HttpClientName = "paddle-billing";
+    private const string MisconfiguredMessage = "El cobro con Paddle no está bien configurado todavía. Escribinos y lo resolvemos.";
 
     private readonly IHttpClientFactory _http;
     private readonly BillingOptions _options;
@@ -130,6 +131,11 @@ public sealed class PaddleSubscriptionGateway : IPaddleSubscriptionGateway
 
     private HttpRequestMessage Request(HttpMethod method, string path, object? body = null)
     {
+        if (_options.Paddle.EnvironmentMismatch() is { } mismatch)
+        {
+            _logger.LogError("Paddle is misconfigured: {Problem}", mismatch);
+            throw new DomainException(MisconfiguredMessage);
+        }
         var req = new HttpRequestMessage(method, new Uri(new Uri(BaseUrl(_options.Paddle)), path));
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.Paddle.ApiKey);
         if (body is not null) req.Content = JsonContent.Create(body);
@@ -149,7 +155,7 @@ public sealed class PaddleSubscriptionGateway : IPaddleSubscriptionGateway
                 _logger.LogWarning("Paddle: {Action} failed with {Status}: {Code} {Detail}", what, (int)res.StatusCode, code, detail);
                 // 401/403 mean the platform's credentials are wrong, which retrying will not fix.
                 if (res.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-                    throw new DomainException("El cobro con Paddle no está bien configurado todavía. Escribinos y lo resolvemos.");
+                    throw new DomainException(MisconfiguredMessage);
                 throw new DomainException($"Paddle no pudo {what} ({(int)res.StatusCode}). Probá de nuevo en unos minutos.");
             }
             return JsonDocument.Parse(body);
