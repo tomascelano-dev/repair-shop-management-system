@@ -103,17 +103,25 @@ jobs:
           check /terminos 'Términos del servicio'
           check /privacidad 'Política de privacidad'
           check /reembolsos 'Política de reembolsos'
-          check / 'Profesional'
+          check / 'Más reparaciones.'
           check / 'href="/reembolsos"'
-          check '/?gclid=abc&utm_source=google' 'Profesional'
+          check '/?gclid=abc&utm_source=google' 'Más reparaciones.'
           check /reembolsos 'mailto:soporte@example.com'
           check /terminos 'El servicio lo presta Taller Ejemplo'
           check /orders 'id="root" class="h-full"></div>'
           check /robots.txt 'User-agent'
+          check /en 'More repairs.'
+          check /en/pricing 'Professional'
+          check /en/terms 'Terms of service'
+          check /en/privacy 'Privacy policy'
+          check /en/refunds 'Refund policy'
+          check /en/terms 'The service is provided by Taller Ejemplo'
+          check /en/refunds 'mailto:soporte@example.com'
+          check /en/pricing 'lang="en"'
           # A signed-in browser gets the app at the bare domain.
           curl -fsS -H 'Cookie: rs_app=1' http://127.0.0.1:8099/ | grep -q 'id="root" class="h-full"></div>' || { echo "/ with rs_app does not serve the app"; exit 1; }
           # Site checkers often send HEAD first: it must not report an empty page.
-          for p in / /precios /terminos /privacidad /reembolsos; do
+          for p in / /precios /terminos /privacidad /reembolsos /en /en/pricing /en/terms /en/privacy /en/refunds; do
             len=$(curl -fsSI "http://127.0.0.1:8099$p" | tr -d '\r' | awk 'tolower($1)=="content-length:" {print $2}')
             [ "${len:-0}" -gt 1000 ] || { echo "HEAD $p reports Content-Length ${len:-none}"; exit 1; }
           done

@@ -6,6 +6,8 @@ import { renderToString } from 'react-dom/server'
 import { StaticRouter } from 'react-router-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { BillingConfig, PlansResponse } from './api/types'
+import { LandingPage } from './features/public/LandingPage'
+import { publicPath, type PublicLocale } from './lib/publicLocale'
 import { PricingPage } from './features/public/PricingPage'
 import { PrivacyPage, RefundPage, TermsPage } from './features/public/LegalPages'
 
@@ -23,6 +25,7 @@ const PLANS: PlansResponse = {
 
 export interface PublicPage {
   path: string
+  locale: PublicLocale
   file: string
   title: string
   description: string
@@ -31,40 +34,21 @@ export interface PublicPage {
   element: () => ReactElement
 }
 
-export const PUBLIC_PAGES: PublicPage[] = [
-  {
-    path: '/precios',
-    file: 'precios.html',
-    title: 'Precios · RepairShop',
-    description: 'Software de gestión para talleres de reparación: órdenes, presupuestos, stock, caja y avisos. Planes mensuales con prueba gratis.',
-    expect: 'Profesional',
-    element: () => <PricingPage initialCountry="US" />,
-  },
-  {
-    path: '/terminos',
-    file: 'terminos.html',
-    title: 'Términos del servicio · RepairShop',
-    description: 'Términos del servicio de RepairShop.',
-    expect: 'Términos del servicio',
-    element: () => <TermsPage />,
-  },
-  {
-    path: '/privacidad',
-    file: 'privacidad.html',
-    title: 'Política de privacidad · RepairShop',
-    description: 'Política de privacidad de RepairShop.',
-    expect: 'Política de privacidad',
-    element: () => <PrivacyPage />,
-  },
-  {
-    path: '/reembolsos',
-    file: 'reembolsos.html',
-    title: 'Política de reembolsos · RepairShop',
-    description: 'Política de reembolsos de RepairShop.',
-    expect: 'Política de reembolsos',
-    element: () => <RefundPage />,
-  },
-]
+export const PUBLIC_PAGES: PublicPage[] = (['es', 'en'] as const).flatMap((locale) => {
+  const en = locale === 'en'
+  const pages = [
+    { section: 'home' as const, title: en ? 'Repair shop management' : 'Gestión de talleres', expect: en ? 'More repairs.' : 'Más reparaciones.', element: () => <LandingPage /> },
+    { section: 'pricing' as const, title: en ? 'Pricing' : 'Precios', expect: en ? 'Professional' : 'Profesional', element: () => <PricingPage initialCountry="US" /> },
+    { section: 'terms' as const, title: en ? 'Terms of service' : 'Términos del servicio', expect: en ? 'Terms of service' : 'Términos del servicio', element: () => <TermsPage /> },
+    { section: 'privacy' as const, title: en ? 'Privacy policy' : 'Política de privacidad', expect: en ? 'Privacy policy' : 'Política de privacidad', element: () => <PrivacyPage /> },
+    { section: 'refunds' as const, title: en ? 'Refund policy' : 'Política de reembolsos', expect: en ? 'Refund policy' : 'Política de reembolsos', element: () => <RefundPage /> },
+  ]
+  return pages.map(({ section, ...page }) => {
+    const path = publicPath(locale, section)
+    return { ...page, locale, path, file: path === '/' ? 'home.html' : `${path.slice(1)}.html`, title: `${page.title} · RepairShop`,
+      description: en ? 'Repair shop software for orders, estimates, inventory and customer updates. Monthly plans with a free trial.' : 'Software para talleres: órdenes, presupuestos, inventario y avisos a clientes. Planes mensuales con prueba gratis.' }
+  })
+})
 
 /**
  * The contact email and seller name come from the server's environment, not from the build: the pages are rendered
@@ -73,6 +57,8 @@ export const PUBLIC_PAGES: PublicPage[] = [
 export const CONTACT_MARKER = '__RS_CONTACT_EMAIL__'
 export const SELLER_MARKER = '__RS_LEGAL_NAME__'
 
+// Build-time SSR entry, not a Fast Refresh component module.
+// eslint-disable-next-line react-refresh/only-export-components
 export function render(page: PublicPage): string {
   const client = new QueryClient()
   client.setQueryData(['plans', 'US'], PLANS)

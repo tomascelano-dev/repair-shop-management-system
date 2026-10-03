@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<UserAdminService>();
         services.AddScoped<ShopSettingsService>();
         services.AddScoped<SubscriptionService>();
+        services.AddScoped<AdConversionService>();
         services.AddScoped<SignupService>();
 
         services.AddScoped<CustomerService>();

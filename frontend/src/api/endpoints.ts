@@ -27,6 +27,7 @@ export const billingApi = {
   subscription: () => get<T.Subscription>('/billing/subscription'),
   checkout: (plan: T.PlanId) => post<T.CheckoutResult>('/billing/checkout', { plan }),
   cancel: () => post<T.Subscription>('/billing/cancel'),
+  revokeAdConsent: () => post<void>('/billing/ad-consent/revoke'),
 }
 
 // ===== Users / settings =====

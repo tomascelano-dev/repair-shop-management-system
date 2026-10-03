@@ -1,3 +1,4 @@
+import { configureTracking, trackPurchase } from '../../lib/marketing'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -28,15 +29,19 @@ export function BillingPage() {
 
   // Stop polling once the payment shows up (or after a minute).
   useEffect(() => {
-    if (!waitingPayment) return
+    if (!waitingPayment || !config.data) return
     if (sub.data && (sub.data.status === 'Active' && !sub.data.pendingPlan)) {
+      if (sub.data.conversionId && config.data) {
+        configureTracking(config.data.tracking)
+        trackPurchase(sub.data.conversionId, sub.data.amount ?? 0, sub.data.currency ?? 'USD')
+      }
       setWaitingPayment(false)
       toast.success('¡Listo! Tu plan está activo.')
       return
     }
     const t = window.setTimeout(() => setWaitingPayment(false), 60_000)
     return () => window.clearTimeout(t)
-  }, [waitingPayment, sub.data])
+  }, [waitingPayment, sub.data, config.data])
 
   // Paddle sends the browser back here with ?_ptxn=txn_...: Paddle.js opens the checkout for that transaction.
   const ptxn = params.get('_ptxn')

@@ -13,6 +13,9 @@ public interface IAppLinks
     /// <summary>Subscription page of the web app (return URL after paying).</summary>
     string Billing();
 
+    /// <summary>Any page of the web app, e.g. Web("/registro").</summary>
+    string Web(string path);
+
     /// <summary>Public base URL of the API (used for webhooks such as Mercado Pago notifications).</summary>
     string ApiBase { get; }
 }

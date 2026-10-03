@@ -29,6 +29,7 @@ public sealed class SubscriptionService
     private readonly IDateTimeProvider _clock;
     private readonly IAppLinks _links;
     private readonly IAuditLog _audit;
+    private readonly AdConversionService _conversions;
     private readonly BillingOptions _options;
     private readonly ILogger<SubscriptionService> _logger;
 
@@ -41,6 +42,7 @@ public sealed class SubscriptionService
         IDateTimeProvider clock,
         IAppLinks links,
         IAuditLog audit,
+        AdConversionService conversions,
         IOptions<BillingOptions> options,
         ILogger<SubscriptionService> logger)
     {
@@ -52,6 +54,7 @@ public sealed class SubscriptionService
         _clock = clock;
         _links = links;
         _audit = audit;
+        _conversions = conversions;
         _options = options.Value;
         _logger = logger;
     }
@@ -243,6 +246,9 @@ public sealed class SubscriptionService
 
         await AuditAsync(sub.OrganizationId, "subscription_updated", Actor.System,
             new { provider = provider.ToString(), status = state.Status.ToString(), plan = sub.Plan.ToString(), until = sub.CurrentPeriodEndsAtUtc }, ct);
+        // First payment of this subscription (not a renewal or a plan change): the conversion ads optimize for.
+        if (!wasLive && sub.HasLiveProviderSubscription && sub.Status == SubscriptionStatus.Active)
+            await _conversions.QueuePurchaseAsync(sub, ct);
         await _uow.SaveChangesAsync(ct);
 
         // A new subscription replaced a running one (paid again from a fresh checkout): stop the old charges.
@@ -291,7 +297,8 @@ public sealed class SubscriptionService
             sub.HasLiveProviderSubscription,
             checkoutAvailable,
             emailVerified,
-            Plans.All.Select(p => ToResponse(p, currency)).ToList());
+            Plans.All.Select(p => ToResponse(p, currency)).ToList(),
+            AdConversionService.PurchaseEventId(sub));
     }
 
     private PlanResponse ToResponse(PlanDefinition p, string currency)

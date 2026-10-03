@@ -80,6 +80,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             ["Billing__Paddle__PriceIds__Basic"] = "pri_basic",
             ["Billing__Paddle__PriceIds__Standard"] = "pri_standard",
             ["Billing__Paddle__PriceIds__Pro"] = "pri_pro",
+            ["Tracking__MetaPixelId"] = "123456789",
+            ["Tracking__MetaCapiToken"] = "integration-private-meta-token",
         };
         foreach (var (key, value) in settings) Environment.SetEnvironmentVariable(key, value);
     }
@@ -130,7 +132,7 @@ public sealed class ApiClient
     }
 
     /// <summary>Signs up a brand-new shop from the website and returns a client logged in as its owner.</summary>
-    public static async Task<(ApiClient Client, JsonElement Login)> SignupAsync(ApiFactory factory, string country = "AR", string? email = null)
+    public static async Task<(ApiClient Client, JsonElement Login)> SignupAsync(ApiFactory factory, string country = "AR", string? email = null, object? attribution = null)
     {
         var http = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true, BaseAddress = new Uri("http://localhost") });
         http.DefaultRequestHeaders.Add("X-RS-Refresh", "1");
@@ -143,7 +145,8 @@ public sealed class ApiClient
             password = "Clave12345",
             country,
             timeZone = "America/Mexico_City",
-            acceptTerms = true
+            acceptTerms = true,
+            attribution
         });
         var data = await res.DataAsync();
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", data.Str("accessToken"));

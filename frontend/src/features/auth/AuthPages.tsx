@@ -1,3 +1,4 @@
+import { publicPath, usePublicLocale } from '../../lib/publicLocale'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -8,6 +9,11 @@ import { useSession } from '../../auth/session'
 import { Alert, Button, Field, Input, Loading } from '../../components/ui'
 
 export function AuthCard({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
+  const locale = usePublicLocale()
+  const legalLinks = locale === 'en' ? [
+    { to: publicPath(locale, 'pricing'), label: 'Pricing' }, { to: publicPath(locale, 'terms'), label: 'Terms' },
+    { to: publicPath(locale, 'privacy'), label: 'Privacy' }, { to: publicPath(locale, 'refunds'), label: 'Refunds' },
+  ] : LEGAL_LINKS
   return (
     <div className="flex min-h-full flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 px-4 py-10">
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
@@ -20,8 +26,8 @@ export function AuthCard({ title, subtitle, children }: { title: string; subtitl
         </div>
         {children}
       </div>
-      <nav aria-label="Legales" className="mt-4 text-center text-xs text-slate-400">
-        {LEGAL_LINKS.map((l, i) => (
+      <nav aria-label={locale === 'en' ? 'Legal' : 'Legales'} className="mt-4 text-center text-xs text-slate-400">
+        {legalLinks.map((l, i) => (
           <span key={l.to}>
             {i > 0 && ' · '}
             <Link to={l.to} className="hover:text-white hover:underline">

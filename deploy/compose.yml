@@ -88,6 +88,14 @@ services:
       Billing__Paddle__PriceIds__Basic: ${PADDLE_PRICE_BASIC:-}
       Billing__Paddle__PriceIds__Standard: ${PADDLE_PRICE_STANDARD:-}
       Billing__Paddle__PriceIds__Pro: ${PADDLE_PRICE_PRO:-}
+      # Medición de anuncios (Google Analytics 4, Google Ads, píxel y API de conversiones de Meta).
+      Tracking__Ga4Id: ${GA4_ID:-}
+      Tracking__GoogleAdsId: ${GOOGLE_ADS_ID:-}
+      Tracking__GoogleAdsSignupLabel: ${GOOGLE_ADS_SIGNUP_LABEL:-}
+      Tracking__GoogleAdsPurchaseLabel: ${GOOGLE_ADS_PURCHASE_LABEL:-}
+      Tracking__MetaPixelId: ${META_PIXEL_ID:-}
+      Tracking__MetaCapiToken: ${META_CAPI_TOKEN:-}
+      Tracking__MetaTestEventCode: ${META_TEST_EVENT_CODE:-}
     volumes:
       # Fotos, firmas, logos y adjuntos de las órdenes.
       - app_data:/app/data/uploads

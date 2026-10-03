@@ -7,6 +7,7 @@ using RepairShop.Api.Billing;
 using RepairShop.Api.Common;
 using RepairShop.Api.Security;
 using RepairShop.Application.Billing;
+using RepairShop.Application.Abstractions;
 using RepairShop.Application.Contracts;
 
 namespace RepairShop.Api.Controllers;
@@ -37,21 +38,42 @@ public sealed class BillingController : ControllerBase
     [HttpGet("config")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimits.Public)]
-    public ActionResult<ApiResponse<BillingConfigResponse>> Config([FromServices] IOptions<BillingOptions> options)
+    public ActionResult<ApiResponse<BillingConfigResponse>> Config([FromServices] IOptions<BillingOptions> options, [FromServices] IOptions<TrackingOptions> tracking)
     {
         var o = options.Value;
+        var t = tracking.Value;
         return Ok(Envelope.Ok(new BillingConfigResponse(
             o.SignupEnabled,
             o.TrialDays,
             o.Paddle.IsConfigured ? o.Paddle.ClientToken : null,
             o.Paddle.IsProduction ? "production" : "sandbox",
             string.IsNullOrWhiteSpace(o.ContactEmail) ? null : o.ContactEmail.Trim(),
-            string.IsNullOrWhiteSpace(o.LegalName) ? null : o.LegalName.Trim())));
+            string.IsNullOrWhiteSpace(o.LegalName) ? null : o.LegalName.Trim(),
+            new TrackingConfigResponse(
+                TrackingOptions.PublicId(t.Ga4Id),
+                TrackingOptions.PublicId(t.GoogleAdsId),
+                TrackingOptions.PublicId(t.GoogleAdsSignupLabel),
+                TrackingOptions.PublicId(t.GoogleAdsPurchaseLabel),
+                TrackingOptions.PublicId(t.MetaPixelId)),
+            VisitorCountry())));
     }
 
     [HttpGet("subscription")]
     public async Task<ActionResult<ApiResponse<SubscriptionResponse>>> Get(CancellationToken ct)
         => Ok(Envelope.Ok(await _subscriptions.GetAsync(CurrentUser.GetOrganizationId(User), CurrentUser.GetUserId(User), ct)));
+
+    [HttpPost("ad-consent/revoke")]
+    [Authorize(Policy = Policies.AdminOnly)]
+    public async Task<IActionResult> RevokeAdConsent([FromServices] IAdTrackingRepository tracking, [FromServices] IUnitOfWork uow, CancellationToken ct)
+    {
+        var attribution = await tracking.GetAttributionAsync(CurrentUser.GetOrganizationId(User), ct);
+        if (attribution is not null)
+        {
+            attribution.RevokeAdConsent();
+            await uow.SaveChangesAsync(ct);
+        }
+        return NoContent();
+    }
 
     [HttpPost("checkout")]
     [Authorize(Policy = Policies.AdminOnly)]
@@ -97,6 +119,16 @@ public sealed class BillingController : ControllerBase
         return Done(await _subscriptions.HandlePaddleWebhookAsync(body, Request.Headers["Paddle-Signature"].FirstOrDefault(), ct));
     }
 
+    /// <summary>
+    /// Country of the visitor as Cloudflare reports it (CF-IPCountry), so the website asks for cookie consent
+    /// before loading ad tags in the EU. Null when unknown; the website then guesses from the time zone.
+    /// </summary>
+    private string? VisitorCountry()
+    {
+        var c = Request.Headers["CF-IPCountry"].ToString().Trim().ToUpperInvariant();
+        return c.Length == 2 && c.All(char.IsAsciiLetterUpper) && c is not "XX" ? c : null;
+    }
+
     private IActionResult Done(WebhookOutcome outcome)
     {
         if (outcome.OrganizationId is { } org) SubscriptionGateFilter.Evict(_cache, org);
@@ -105,4 +137,14 @@ public sealed class BillingController : ControllerBase
 }
 
 public sealed record BillingConfigResponse(
-    bool SignupEnabled, int TrialDays, string? PaddleClientToken, string PaddleEnvironment, string? ContactEmail, string? LegalName);
+    bool SignupEnabled,
+    int TrialDays,
+    string? PaddleClientToken,
+    string PaddleEnvironment,
+    string? ContactEmail,
+    string? LegalName,
+    TrackingConfigResponse Tracking,
+    string? VisitorCountry);
+
+/// <summary>Ad measurement tags the website loads (each null when not configured).</summary>
+public sealed record TrackingConfigResponse(string? Ga4Id, string? GoogleAdsId, string? GoogleAdsSignupLabel, string? GoogleAdsPurchaseLabel, string? MetaPixelId);

@@ -70,6 +70,7 @@ public static class DependencyInjection
         {
             services.AddHostedService<NotificationDispatcherService>();
             services.AddHostedService<ScheduledJobsService>();
+            services.AddHostedService<MetaConversionsDispatcherService>();
         }
 
         return services;
@@ -86,6 +87,7 @@ public static class DependencyInjection
         services.AddScoped<IStoredFileRepository, StoredFileRepository>();
         services.AddScoped<IExchangeRateRepository, ExchangeRateRepository>();
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+        services.AddScoped<IAdTrackingRepository, AdTrackingRepository>();
         services.AddScoped<IShopProvisioner, ShopProvisioner>();
 
         // CRM
@@ -192,6 +194,14 @@ public static class DependencyInjection
         });
         services.AddSingleton<ISubscriptionGateway, MercadoPagoSubscriptionGateway>();
         services.AddSingleton<ISubscriptionGateway, PaddleSubscriptionGateway>();
+
+        services.Configure<TrackingOptions>(config.GetSection(TrackingOptions.SectionName));
+        services.AddHttpClient(MetaConversionsDispatcher.HttpClientName, c =>
+        {
+            c.Timeout = TimeSpan.FromSeconds(20);
+            c.DefaultRequestHeaders.UserAgent.Add(userAgent);
+        });
+        services.AddScoped<MetaConversionsDispatcher>();
     }
 
     private static void AddNotifications(IServiceCollection services, IConfiguration config)

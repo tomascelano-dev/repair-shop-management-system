@@ -4,6 +4,8 @@ import type { Permission } from './api/types'
 import { RequireAuth, RequirePermission } from './auth/guards'
 import { AppLayout } from './components/layout/AppLayout'
 import { Loading } from './components/ui'
+import { Marketing } from './components/Marketing'
+import { useSession } from './auth/session'
 import { AcceptInvitationPage, ForgotPasswordPage, LoginPage, ResetPasswordPage } from './features/auth/AuthPages'
 
 // Route-level code splitting: each section downloads only when it is opened.
@@ -33,6 +35,7 @@ const TrackingPage = page(() => import('./features/portal/TrackingPage'), 'Track
 const BillingPage = page(() => import('./features/billing/BillingPage'), 'BillingPage')
 const SignupPage = page(() => import('./features/public/SignupPage'), 'SignupPage')
 const VerifyEmailPage = page(() => import('./features/public/SignupPage'), 'VerifyEmailPage')
+const LandingPage = page(() => import('./features/public/LandingPage'), 'LandingPage')
 const PricingPage = page(() => import('./features/public/PricingPage'), 'PricingPage')
 const TermsPage = page(() => import('./features/public/LegalPages'), 'TermsPage')
 const PrivacyPage = page(() => import('./features/public/LegalPages'), 'PrivacyPage')
@@ -44,8 +47,17 @@ function Guard({ permission, children }: { permission: Permission; children: Rea
 
 export default function App() {
   return (
+    <>
+    <Marketing />
     <Suspense fallback={<Loading />}>
       <Routes>
+        <Route path="/" element={<HomePage />}><Route index element={<DashboardPage />} /></Route>
+        <Route path="/en" element={<LandingPage />} />
+        <Route path="/en/pricing" element={<PricingPage />} />
+        <Route path="/en/signup" element={<SignupPage />} />
+        <Route path="/en/terms" element={<TermsPage />} />
+        <Route path="/en/privacy" element={<PrivacyPage />} />
+        <Route path="/en/refunds" element={<RefundPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/olvide" element={<ForgotPasswordPage />} />
         <Route path="/restablecer" element={<ResetPasswordPage />} />
@@ -65,7 +77,6 @@ export default function App() {
             </RequireAuth>
           }
         >
-          <Route index element={<DashboardPage />} />
           <Route path="orders" element={<OrdersPage />} />
           <Route path="orders/board" element={<BoardPage />} />
           <Route path="orders/new" element={<Guard permission="orders.manage"><NewOrderPage /></Guard>} />
@@ -88,6 +99,7 @@ export default function App() {
         </Route>
       </Routes>
     </Suspense>
+    </>
   )
 }
 
@@ -101,4 +113,11 @@ function NotFound() {
       </Link>
     </div>
   )
+}
+
+function HomePage() {
+  const { state } = useSession()
+  if (state.status === 'loading') return <Loading />
+  if (state.status === 'anonymous') return <LandingPage />
+  return <AppLayout />
 }

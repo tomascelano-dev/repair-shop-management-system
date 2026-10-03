@@ -30,7 +30,8 @@ public sealed record SubscriptionResponse(
     bool CanManageAtProvider,
     bool CheckoutAvailable,
     bool EmailVerified,
-    IReadOnlyList<PlanResponse> Plans);
+    IReadOnlyList<PlanResponse> Plans,
+    string? ConversionId);
 
 public sealed record CheckoutRequest(string Plan);
 
@@ -44,6 +45,25 @@ public sealed record SignupRequest(
     string Password,
     string Country,
     string? TimeZone,
-    bool AcceptTerms);
+    bool AcceptTerms,
+    SignupAttributionRequest? Attribution = null);
+
+/// <summary>Campaign parameters and ad cookies the website captured during the visit (all optional).</summary>
+public sealed record SignupAttributionRequest(
+    string? UtmSource = null,
+    string? UtmMedium = null,
+    string? UtmCampaign = null,
+    string? UtmTerm = null,
+    string? UtmContent = null,
+    string? Gclid = null,
+    string? Gbraid = null,
+    string? Wbraid = null,
+    string? Fbclid = null,
+    string? Fbp = null,
+    string? Fbc = null,
+    string? LandingPath = null,
+    string? Referrer = null,
+    bool AdConsent = false,
+    string? EventId = null);
 
 public sealed record VerifyEmailRequest(string Token);

@@ -25,6 +25,8 @@ public sealed class SignupService
     private readonly IDateTimeProvider _clock;
     private readonly IAuditLog _audit;
     private readonly AuthService _auth;
+    private readonly IAdTrackingRepository _tracking;
+    private readonly AdConversionService _conversions;
     private readonly BillingOptions _options;
 
     public SignupService(
@@ -37,6 +39,8 @@ public sealed class SignupService
         IDateTimeProvider clock,
         IAuditLog audit,
         AuthService auth,
+        IAdTrackingRepository tracking,
+        AdConversionService conversions,
         IOptions<BillingOptions> options)
     {
         _shops = shops;
@@ -48,6 +52,8 @@ public sealed class SignupService
         _clock = clock;
         _audit = audit;
         _auth = auth;
+        _tracking = tracking;
+        _conversions = conversions;
         _options = options.Value;
     }
 
@@ -75,6 +81,7 @@ public sealed class SignupService
         shop.UpdateRegional(regional.Currency, regional.Currency, regional.PhoneCountryCode, regional.TimeZone, now);
         var user = new AppUser(shop.Id, email, ownerName, UserRole.Admin, _hasher.Hash(req.Password), now);
         var subscription = Subscription.StartTrial(shop.OrganizationId, country, _options.TrialDays, now);
+        var attribution = new SignupAttribution(shop.OrganizationId, user.Id, ToData(req.Attribution), ip, userAgent, now);
 
         await _uow.InTransactionAsync(async tct =>
         {
@@ -83,15 +90,22 @@ public sealed class SignupService
             await _users.AddAsync(user, tct);
             await _subscriptions.AddAsync(subscription, tct);
             await _provisioner.ProvisionAsync(shop.Id, tct);
+            await _tracking.AddAttributionAsync(attribution, tct);
+            await _conversions.QueueTrialStartedAsync(attribution, user, country, tct);
             await _auth.QueueEmailVerificationAsync(user, tct);
             await _audit.AddAsync(shop.Id, "shop", shop.Id, "shop_signup", new Actor(user.Id, user.Email, user.Role.ToString()),
-                new { country, trialDays = _options.TrialDays }, tct);
+                new { country, trialDays = _options.TrialDays, source = attribution.Source, campaign = attribution.Campaign }, tct);
             await _uow.SaveChangesAsync(tct);
             return true;
         }, ct);
 
         return await _auth.SignInAsync(user, ip, userAgent, ct);
     }
+
+    private static SignupAttributionData ToData(SignupAttributionRequest? a) => a is null
+        ? new SignupAttributionData()
+        : new SignupAttributionData(a.UtmSource, a.UtmMedium, a.UtmCampaign, a.UtmTerm, a.UtmContent, a.Gclid, a.Gbraid, a.Wbraid, a.Fbclid,
+            a.Fbp, a.Fbc, a.LandingPath, a.Referrer, a.AdConsent, a.EventId);
 
     private static bool IsPlausibleEmail(string email)
     {
