@@ -38,6 +38,10 @@ export function hasSessionHint(): boolean {
   }
 }
 
+// The web server reads the same hint as a cookie: browsers without it get the pre-rendered pricing page at the bare
+// domain (visitors, crawlers and Paddle's reviewer), the others get the app.
+const SESSION_COOKIE = 'rs_app'
+
 export function setSessionHint(active: boolean) {
   try {
     if (active) localStorage.setItem(SESSION_HINT, '1')
@@ -45,6 +49,10 @@ export function setSessionHint(active: boolean) {
   } catch {
     // storage blocked: we'll just try the refresh next time
   }
+  const secure = location.protocol === 'https:' ? '; Secure' : ''
+  document.cookie = active
+    ? `${SESSION_COOKIE}=1; Path=/; Max-Age=31536000; SameSite=Lax${secure}`
+    : `${SESSION_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure}`
 }
 
 function correlationId() {

@@ -103,10 +103,20 @@ jobs:
           check /terminos 'Términos del servicio'
           check /privacidad 'Política de privacidad'
           check /reembolsos 'Política de reembolsos'
+          check / 'Profesional'
           check / 'href="/reembolsos"'
+          check '/?gclid=abc&utm_source=google' 'Profesional'
           check /reembolsos 'mailto:soporte@example.com'
           check /terminos 'El servicio lo presta Taller Ejemplo'
           check /orders 'id="root" class="h-full"></div>'
+          check /robots.txt 'User-agent'
+          # A signed-in browser gets the app at the bare domain.
+          curl -fsS -H 'Cookie: rs_app=1' http://127.0.0.1:8099/ | grep -q 'id="root" class="h-full"></div>' || { echo "/ with rs_app does not serve the app"; exit 1; }
+          # Site checkers often send HEAD first: it must not report an empty page.
+          for p in / /precios /terminos /privacidad /reembolsos; do
+            len=$(curl -fsSI "http://127.0.0.1:8099$p" | tr -d '\r' | awk 'tolower($1)=="content-length:" {print $2}')
+            [ "${len:-0}" -gt 1000 ] || { echo "HEAD $p reports Content-Length ${len:-none}"; exit 1; }
+          done
 
   e2e:
     name: End-to-end (Playwright)
