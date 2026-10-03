@@ -45,6 +45,12 @@
 		# The public pages are pre-rendered at build time (precios.html, terminos.html...) so they have content
 		# without JavaScript; every other route gets the SPA shell.
 		try_files {path} {path}.html /index.html
+		# Fill in the contact email and seller name from the container's environment (see frontend/scripts/prerender.mjs).
+		@prerendered path /precios.html /terminos.html /privacidad.html /reembolsos.html
+		templates @prerendered {
+			mime text/html
+			between [[ ]]
+		}
 		file_server
 	}
 }
