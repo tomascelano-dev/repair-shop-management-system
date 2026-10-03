@@ -1,0 +1,121 @@
+# RepairShop · stack de producción detrás de un proxy existente (Caddy del host + Cloudflare).
+# Uso, desde esta carpeta en el servidor:
+#   cp .env.example .env        # completar (ver README.md)
+#   docker compose up -d --build
+# El sitio queda en http://127.0.0.1:${WEB_PORT}; el proxy del host publica ${DOMAIN} con HTTPS hacia ese puerto.
+name: repairshop-taller
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: repairshop
+      POSTGRES_USER: repairshop
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U repairshop -d repairshop"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__RepairShopDb: Host=db;Port=5432;Database=repairshop;Username=repairshop;Password=${DB_PASSWORD}
+      Jwt__Key: ${JWT_KEY:?Falta JWT_KEY en .env}
+      # Cifra las claves que protegen tokens de Mercado Pago y certificados ARCA. Guardala también fuera del servidor.
+      DataProtection__MasterKey: ${MASTER_KEY:?Falta MASTER_KEY en .env}
+      App__FrontendBaseUrl: https://${DOMAIN:?Falta DOMAIN en .env}
+      App__PublicApiUrl: https://${DOMAIN}
+      Cors__AllowedOrigins__0: https://${DOMAIN}
+      # localhost: el healthcheck del contenedor.
+      AllowedHosts: ${DOMAIN};localhost
+      Auth__RefreshCookie__Secure: "true"
+      HttpsRedirection__Enabled: "false"
+      Swagger__Enabled: "false"
+      Seed__Enabled: "false"
+      Database__Init: Migrate
+      Database__ConnectRetries: "30"
+      # Solo el contenedor web llega a la API (no tiene puertos publicados): se confía en su X-Forwarded-For.
+      ReverseProxy__KnownNetworks__0: 10.0.0.0/8
+      ReverseProxy__KnownNetworks__1: 172.16.0.0/12
+      ReverseProxy__KnownNetworks__2: 192.168.0.0/16
+      Storage__Provider: Local
+      Storage__Local__RootPath: /app/data/uploads
+      Notifications__Email__Provider: ${EMAIL_PROVIDER:-None}
+      Notifications__Smtp__Host: ${SMTP_HOST:-}
+      Notifications__Smtp__Port: ${SMTP_PORT:-587}
+      Notifications__Smtp__Username: ${SMTP_USERNAME:-}
+      Notifications__Smtp__Password: ${SMTP_PASSWORD:-}
+      Notifications__Smtp__FromAddress: ${SMTP_FROM:-}
+      Notifications__Smtp__FromName: ${SMTP_FROM_NAME:-RepairShop}
+      Notifications__WhatsApp__Provider: ${WHATSAPP_PROVIDER:-None}
+      Notifications__Twilio__AccountSid: ${TWILIO_ACCOUNT_SID:-}
+      Notifications__Twilio__AuthToken: ${TWILIO_AUTH_TOKEN:-}
+      Notifications__Twilio__WhatsAppFrom: ${TWILIO_WHATSAPP_FROM:-}
+      Notifications__Meta__PhoneNumberId: ${META_PHONE_NUMBER_ID:-}
+      Notifications__Meta__AccessToken: ${META_ACCESS_TOKEN:-}
+      Notifications__Meta__TemplateName: ${META_TEMPLATE_NAME:-}
+      Ai__Provider: ${AI_PROVIDER:-None}
+      Ai__Anthropic__ApiKey: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      # Fotos, firmas, logos y adjuntos de las órdenes.
+      - app_data:/app/data/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/readyz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8086}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  backup:
+    build: ./backup
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGDATABASE: repairshop
+      PGUSER: repairshop
+      PGPASSWORD: ${DB_PASSWORD}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-6}
+      # Copia fuera del servidor con rclone (por ejemplo "r2:repairshop-backups"); configurar backup/rclone.conf.
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-}
+      RCLONE_CONFIG: /config/rclone/rclone.conf
+    volumes:
+      - backups:/backups
+      - app_data:/app/data/uploads:ro
+      - ./backup/rclone.conf:/config/rclone/rclone.conf:ro
+
+volumes:
+  db_data:
+  app_data:
+  backups:

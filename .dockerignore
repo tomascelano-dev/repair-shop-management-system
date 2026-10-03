@@ -1,0 +1,9 @@
+# Build context of deploy/web.Dockerfile (repository root): only the frontend sources are needed.
+.git
+**/node_modules
+**/bin
+**/obj
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+docs

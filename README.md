@@ -104,7 +104,7 @@ Open http://localhost:5173 and sign in with a demo user:
 
 API: http://localhost:8080 · Swagger: http://localhost:8080/swagger · Health: `/healthz`, `/readyz`.
 
-Configuration, integrations and production deployment are documented in the [backend README](backend/README.md) and the [frontend README](frontend/README.md). Example configuration files: `backend/.env.example`, `backend/src/RepairShop.Api/appsettings.Example.json`, `frontend/.env.example`. Never commit real secrets.
+Production deployment on a server with its own reverse proxy (web app, API, database and daily backups): [`deploy/README.md`](deploy/README.md). Configuration and integrations are documented in the [backend README](backend/README.md) and the [frontend README](frontend/README.md). Example configuration files: `backend/.env.example`, `backend/src/RepairShop.Api/appsettings.Example.json`, `frontend/.env.example`. Never commit real secrets.
 
 ## Tests and CI
 

@@ -75,12 +75,24 @@ jobs:
       - run: npm run build
 
   docker:
-    name: Docker image
+    name: Docker images and deploy stack
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build API image
         run: docker build -t repairshop-api:ci backend
+      - name: Build web image (frontend + Caddy)
+        run: docker build -f deploy/web.Dockerfile -t repairshop-web:ci .
+      - name: Validate the production compose file
+        working-directory: deploy
+        env:
+          DOMAIN: ci.example.com
+          DB_PASSWORD: ci
+          JWT_KEY: ci-signing-key-0123456789abcdef0123456789
+          MASTER_KEY: ci
+        run: docker compose -f compose.yml config --quiet
+      - name: Validate the Caddyfile
+        run: docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
   e2e:
     name: End-to-end (Playwright)

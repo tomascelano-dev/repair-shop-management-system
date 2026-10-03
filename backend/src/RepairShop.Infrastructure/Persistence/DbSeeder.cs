@@ -23,8 +23,9 @@ public static class DbSeeder
     };
 
     /// <summary>
-    /// Seeds a default shop, one user per role and the starter message templates (insert-missing only,
-    /// so customized templates are never overwritten). Optionally adds demo customers, stock and orders.
+    /// Seeds a default shop and the starter message templates (insert-missing only, so customized templates are
+    /// never overwritten). The well-known demo users are only created when <paramref name="devUsers"/> is true
+    /// (Development); optionally adds demo customers, stock and orders.
     /// </summary>
     public static async Task SeedAsync(
         RepairShopDbContext db,
@@ -32,7 +33,31 @@ public static class DbSeeder
         IPasswordHasher hasher,
         string shopName = "TechXto",
         bool demoData = false,
+        bool devUsers = true,
         CancellationToken ct = default)
+    {
+        var now = clock.UtcNow;
+        var shop = await EnsureShopAsync(db, clock, shopName, ct);
+
+        if (devUsers)
+        {
+            foreach (var u in DevUsers)
+            {
+                var exists = await db.Users.IgnoreQueryFilters().AnyAsync(x => x.Email == u.Email, ct);
+                if (exists) continue;
+                await db.Users.AddAsync(new AppUser(shop.Id, u.Email, u.DisplayName, u.Role, hasher.Hash(u.Password), now), ct);
+            }
+            await db.SaveChangesAsync(ct);
+        }
+
+        if (demoData) await SeedDemoDataAsync(db, shop, now, ct);
+    }
+
+    /// <summary>
+    /// Returns the first shop, creating it when the database is empty, and makes sure every shop has the
+    /// starter message templates (new template keys arrive with upgrades). Creates no users.
+    /// </summary>
+    public static async Task<Shop> EnsureShopAsync(RepairShopDbContext db, IDateTimeProvider clock, string shopName, CancellationToken ct = default)
     {
         var now = clock.UtcNow;
 
@@ -45,20 +70,10 @@ public static class DbSeeder
             await db.SaveChangesAsync(ct);
         }
 
-        foreach (var u in DevUsers)
-        {
-            var exists = await db.Users.IgnoreQueryFilters().AnyAsync(x => x.Email == u.Email, ct);
-            if (exists) continue;
-            await db.Users.AddAsync(new AppUser(shop.Id, u.Email, u.DisplayName, u.Role, hasher.Hash(u.Password), now), ct);
-        }
-
-        // Every shop (branches included) gets new template keys after an upgrade.
         foreach (var shopId in await db.Shops.Select(s => s.Id).ToListAsync(ct))
             await SeedTemplatesAsync(db, shopId, now, ct);
-
         await db.SaveChangesAsync(ct);
-
-        if (demoData) await SeedDemoDataAsync(db, shop, now, ct);
+        return shop;
     }
 
     public static IReadOnlyList<(string Key, string Title, string Body)> DefaultTemplates { get; } = new (string Key, string Title, string Body)[]

@@ -28,7 +28,9 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var isSeedCommand = args.Any(a => string.Equals(a, "--seed", StringComparison.OrdinalIgnoreCase))
+var isAdminCommand = AdminCommand.Matches(args);
+var isSeedCommand = isAdminCommand
+    || args.Any(a => string.Equals(a, "--seed", StringComparison.OrdinalIgnoreCase))
     || (args.Length >= 2
         && string.Equals(args[0], "db", StringComparison.OrdinalIgnoreCase)
         && string.Equals(args[1], "seed", StringComparison.OrdinalIgnoreCase));
@@ -336,7 +338,13 @@ app.MapHealthChecks("/readyz", new HealthCheckOptions
     ResponseWriter = HealthCheckResponseWriter.WriteJson
 }).AllowAnonymous();
 
-await InitializeDatabaseAsync(app, config, forceSeed: isSeedCommand);
+await InitializeDatabaseAsync(app, config, forceSeed: isSeedCommand && !isAdminCommand);
+
+if (isAdminCommand)
+{
+    Environment.ExitCode = await AdminCommand.RunAsync(app, args);
+    return;
+}
 
 if (isSeedCommand) return;
 
@@ -394,7 +402,9 @@ static async Task InitializeDatabaseAsync(WebApplication app, IConfiguration con
             sp.GetRequiredService<IPasswordHasher>(),
             config.GetValue<string>("Seed:ShopName") ?? "TechXto",
             demoData: config.GetValue("Seed:DemoData", app.Environment.IsDevelopment()),
-            ct);
+            // The demo users have published passwords: never outside Development. Use "admin create" instead.
+            devUsers: app.Environment.IsDevelopment(),
+            ct: ct);
         app.Logger.LogInformation("Database seed completed.");
     }
     catch (Exception seedEx)

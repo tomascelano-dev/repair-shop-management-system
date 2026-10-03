@@ -120,11 +120,16 @@ Con `Jobs__Enabled=true`, la API ejecuta en segundo plano (con locks de PostgreS
 
 ## Base de datos
 
-- Las migraciones se aplican al iniciar (`Database__Init=Migrate`; `None` para manejarlas aparte). Con `--seed` se puede sembrar una base fuera de Development.
+- Las migraciones se aplican al iniciar (`Database__Init=Migrate`; `None` para manejarlas aparte).
+- **Primer administrador en producción**: `dotnet RepairShop.Api.dll admin create <email> ["Nombre"] ["Nombre del taller"]`. Crea el taller (si la base está vacía) y el administrador, e imprime un link de un solo uso para elegir la contraseña. Con un email existente genera un link nuevo para cambiarla (recuperación de acceso). Los usuarios de demo con contraseñas conocidas solo se crean en Development.
 - La migración `PlatformModules` actualiza bases de versiones anteriores: corrige referencias inconsistentes entre sucursales, completa columnas nuevas, numera órdenes existentes e inicializa contadores. Requiere PostgreSQL 13+.
 - Concurrencia optimista (`xmin`) en órdenes, stock, ventas, compras y caja: un conflicto devuelve **409** en vez de pisar datos.
 
 ## Producción
+
+Para un servidor con un reverse proxy propio (Caddy/nginx en el host, Cloudflare), usá el stack completo de [`deploy/`](../deploy/README.md): API, PostgreSQL, interfaz servida por Caddy y copias de seguridad diarias.
+
+Para levantar solo la API y PostgreSQL con los archivos de esta carpeta:
 
 ```bash
 cp .env.example .env    # completar secretos y URLs
