@@ -26,7 +26,7 @@ const SAMPLE: Record<string, string> = {
   device_serial: 'R58N12345',
   device_imei: '356938035643809',
   issue_description: 'Pantalla rota, no da imagen',
-  order_code: 'OT-000123',
+  order_code: '#000123',
   order_status_label: 'Listo para retirar',
   order_total: '$ 85.000,00',
   paid_total: '$ 50.000,00',

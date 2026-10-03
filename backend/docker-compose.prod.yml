@@ -6,7 +6,17 @@
 # - Swagger and Seed are forced OFF in production.
 # - Provide secrets via env/.env (gitignored) or your secret manager.
 services:
+  postgres:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    # No published ports: only the API reaches the database.
+
   api:
+    restart: unless-stopped
+    ports:
+      # Bound to localhost: publish it through your TLS reverse proxy (Caddy, nginx, Traefik).
+      - "${API_BIND_ADDRESS:-127.0.0.1}:8080:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       # Secrets (do NOT commit real values)

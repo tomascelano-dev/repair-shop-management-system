@@ -292,6 +292,10 @@ if (app.Environment.IsProduction() && !isSeedCommand)
     var allowedHosts = (config["AllowedHosts"] ?? string.Empty).Trim();
     if (string.IsNullOrWhiteSpace(allowedHosts) || allowedHosts == "*")
         throw new InvalidOperationException("AllowedHosts must list your API domain(s) in Production (e.g. api.example.com).");
+
+    if (RepairShop.Infrastructure.Security.MasterKey.From(config) is null)
+        app.Logger.LogWarning("DataProtection:MasterKey is not set: the key ring that protects shop secrets (Mercado Pago tokens, ARCA certificates) " +
+                              "is stored unencrypted in the database. Set DataProtection__MasterKey (e.g. `openssl rand -base64 32`).");
 }
 
 if (app.Environment.IsDevelopment() || config.GetValue<bool>("Swagger:Enabled"))

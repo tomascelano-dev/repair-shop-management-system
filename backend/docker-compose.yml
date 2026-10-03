@@ -6,8 +6,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: repairshop
-    ports:
-      - "5432:5432"
+    # Ports are published by the dev/prod overrides (production keeps the database private).
     volumes:
       - repairshop_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -42,13 +41,13 @@ services:
       Database__ConnectDelayMs: "2000"
       Storage__Provider: Local
       Storage__Local__RootPath: /app/data/uploads
-      # The API sits behind the web container (nginx) on the compose network: trust its X-Forwarded-For.
+      # X-Forwarded-For is only trusted from Docker networks: a reverse proxy container on this network,
+      # or one on the host (it reaches the container through the bridge gateway). Never expose the API
+      # directly to the internet without a proxy in front.
       ReverseProxy__KnownNetworks__0: 172.16.0.0/12
       ReverseProxy__KnownNetworks__1: 192.168.0.0/16
     volumes:
       - repairshop_uploads:/app/data/uploads
-    ports:
-      - "8080:8080"
 
 volumes:
   repairshop_pgdata:

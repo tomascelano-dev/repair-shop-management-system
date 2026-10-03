@@ -10,12 +10,13 @@ import { cn } from '../../lib/cn'
 import { date, dateTime, money } from '../../lib/format'
 import { ORDER_STATUS } from '../../lib/labels'
 
+// Soft hyphens (\u00AD) let long labels wrap on narrow phones instead of overlapping.
 const STEPS: { status: OrderStatus[]; label: string }[] = [
   { status: ['Received'], label: 'Recibido' },
-  { status: ['Diagnosing'], label: 'Diagnóstico' },
-  { status: ['WaitingParts', 'InProgress', 'Testing'], label: 'Reparación' },
+  { status: ['Diagnosing'], label: 'Diag\u00ADnóstico' },
+  { status: ['WaitingParts', 'InProgress', 'Testing'], label: 'Repa\u00ADración' },
   { status: ['Ready'], label: 'Listo' },
-  { status: ['Delivered'], label: 'Entregado' },
+  { status: ['Delivered'], label: 'Entre\u00ADgado' },
 ]
 
 export function TrackingPage() {
@@ -155,7 +156,7 @@ function StatusCard({ data }: { data: PublicTracking }) {
           {STEPS.map((s, i) => (
             <li key={s.label} className="text-center">
               <span className={cn('mx-auto block h-1.5 rounded-full', i <= current ? 'bg-brand-600' : 'bg-slate-200')} />
-              <span className={cn('mt-1.5 block text-[11px]', i === current ? 'font-semibold text-brand-700' : i < current ? 'text-slate-600' : 'text-slate-400')} aria-current={i === current ? 'step' : undefined}>
+              <span className={cn('mt-1.5 block hyphens-manual break-words text-[11px] leading-tight', i === current ? 'font-semibold text-brand-700' : i < current ? 'text-slate-600' : 'text-slate-400')} aria-current={i === current ? 'step' : undefined}>
                 {s.label}
               </span>
             </li>

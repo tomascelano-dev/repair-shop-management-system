@@ -1,50 +1,46 @@
-# Checklist, notas y adjuntos en el flujo
+# Checklists, notas, fotos y firmas
 
-En RepairShop, la información “operativa” de una orden se guarda separada en piezas chicas para que el flujo sea editable y auditable.
+La información operativa de una orden se guarda en piezas chicas, editables y auditadas. Todas las rutas cuelgan de `/api/v1/orders/{orderId}`.
 
 ## Checklist de recepción
 
-Entidad: `RepairOrderReceptionChecklist`
+Cómo ingresó el equipo: pantalla, cámaras, parlantes, micrófono, botones, Face ID, huella, bloqueo de cuenta (iCloud/Google), batería y estado estético. Se completa en la recepción y queda impreso en el comprobante que firma el cliente.
 
-Casos típicos:
+- `GET checklist` → el checklist o `null` si todavía no se cargó.
+- `PUT checklist` → crea o actualiza (permiso de gestión de órdenes). Auditoría: `checklist_updated`.
 
-- Estado del equipo al ingresar (pantalla, cámara, sensores, face-id, etc.)
-- Señales de humedad
-- Accesorios entregados
-- Observaciones de recepción
+## Control de calidad de salida (QA)
 
-### Endpoints
+Pruebas antes de entregar: enciende, pantalla, táctil, cámaras, audio, micrófono, botones, carga, conectividad, biometría, salud de batería y notas. Cada ítem es OK / falla / no aplica.
 
-- `GET /api/v1/orders/{orderId}/checklist`
-  - Devuelve **404** si todavía no existe checklist (orden “sin checklist cargado”).
-- `PUT /api/v1/orders/{orderId}/checklist`
-  - **Upsert**: crea o actualiza.
-  - Genera evento de auditoría `checklist_updated`.
+- `GET qa` → el control o `null`.
+- `PUT qa` con `approve: true` lo aprueba (no se puede aprobar con fallas). **Es obligatorio para pasar a “Listo para retirar”**, y un reproceso posterior lo invalida. Auditoría: `qa_saved`.
 
 ## Notas
 
-Notas simples para registrar diagnóstico, acuerdos con el cliente, etc.
+- `GET notes` / `POST notes` (`body`, `isPublic`).
+- Las notas **públicas** se muestran en el portal del cliente como “novedades del taller”; las internas solo las ve el equipo. Auditoría de las públicas: `public_note_added`.
 
-### Endpoints
+## Fotos y documentos
 
-- `GET /api/v1/orders/{orderId}/notes`
-  - Lista notas.
-- `POST /api/v1/orders/{orderId}/notes`
-  - Crea una nota.
+- `POST attachments/upload` (multipart, campo `file`, `label` opcional): fotos JPG/PNG/WebP/GIF/HEIC hasta 10 MB y PDF hasta 15 MB. El tipo se detecta por el contenido del archivo, no por la extensión.
+- `POST attachments` registra un link externo (`url`, `label`).
+- `GET attachments` devuelve URLs **firmadas que vencen a los 30 minutos**: una foto no queda accesible para siempre aunque se comparta el link.
+- `DELETE attachments/{id}`.
+- Los archivos se guardan en disco (volumen Docker) o en S3/R2 según `Storage__Provider`. Auditoría: `attachment_uploaded` / `attachment_deleted`.
 
-## Adjuntos
+## Firmas
 
-Los adjuntos se modelan como **links** (URL) + etiqueta (por ejemplo, foto en Cloudinary/Drive).
+- `POST signatures` (`kind`: `Reception` | `Delivery`, `signerName`, `imageDataUrl` PNG). La firma de recepción se pide al ingresar el equipo y aparece en el comprobante; la de entrega, al retirarlo.
 
-### Endpoints
+## Código de desbloqueo
 
-- `GET /api/v1/orders/{orderId}/attachments`
-  - Lista adjuntos.
-- `POST /api/v1/orders/{orderId}/attachments`
-  - Crea adjunto.
+- `PUT unlock` (`method`: `None` | `Pin` | `Password` | `Pattern`, `value`): se guarda cifrado.
+- `POST unlock/reveal` lo muestra y deja registro en la auditoría (`unlock_secret_viewed`).
+- Se borra automáticamente al entregar o cancelar la orden.
 
 ## Recomendación operativa
 
-- Checklist al ingresar (te ahorra disputas).
-- Notas durante diagnóstico y antes de “Ready”.
-- Adjuntos para evidencias (antes/después, daño previo, etc.).
+- Checklist y fotos al ingresar: evitan discusiones por daños previos.
+- Notas públicas en cada avance: bajan las consultas de “¿ya está?”.
+- QA siempre antes de avisar que está listo, y fotos del “después”.

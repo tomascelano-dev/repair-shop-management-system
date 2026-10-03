@@ -1,268 +1,130 @@
 # RepairShop Management System
 
-Full-stack internal management system for repair shops to manage customers, devices, repair orders, inventory, payments, status history and message templates.
+Full-stack management platform for phone and computer repair shops: device intake, repair orders with an enforced workflow, quotes approved by the customer online, inventory and purchasing, a point of sale with cash register control, Argentine e-invoicing (ARCA), automated customer messages, reports and a public tracking portal.
 
-This project is built as a real business-oriented application, not a generic CRUD demo. It shows how a repair shop can organize its daily workflow from customer intake to repair tracking, inventory usage and operational follow-up.
+Built as a real business application for workshops in Argentina (Spanish UI, ARS/USD, Mercado Pago, ARCA), not a CRUD demo.
 
-## Problem
+![Dashboard](docs/screenshots/02-dashboard.png)
 
-Small repair shops often manage customers, devices, repair orders and payments using WhatsApp chats, paper notes or spreadsheets. This creates several problems:
+## What it solves
 
-- Repair orders are hard to track.
-- Customer and device information gets duplicated or lost.
-- Status changes are not clearly recorded.
-- Inventory usage is disconnected from each repair.
-- Message templates and follow-ups are handled manually.
-- There is no centralized dashboard for daily operations.
+Small repair shops usually run on WhatsApp chats, paper tickets and spreadsheets: repairs get lost, customers keep asking "is it ready?", quotes are approved by voice, stock and cash never match, and nobody knows which technician or which repair is profitable.
 
-## Solution
-
-RepairShop Management System centralizes the repair workflow in a web application with a structured backend API and a React frontend.
-
-The system allows a repair shop to:
-
-- Register customers.
-- Register customer devices.
-- Create and manage repair orders.
-- Track repair order status changes.
-- Manage inventory items and parts usage.
-- Register payments.
-- Use message templates for customer updates.
-- View operational data from a dashboard.
-- Protect access with authentication and roles.
+RepairShop centralizes the whole cycle — **intake → diagnosis → quote → repair → QA → pickup → warranty** — and connects it with stock, sales, cash and invoicing.
 
 ## Features
 
-- JWT-based authentication.
-- Role-based access structure.
-- Customer management.
-- Device management.
-- Repair order creation and tracking.
-- Repair order status workflow.
-- Order notes and status history.
-- Inventory management.
-- Parts usage tracking.
-- Payment registration.
-- Message templates.
-- Dashboard summary.
-- API health checks.
-- Docker Compose setup for API and PostgreSQL.
-- Backend tests.
+**Workshop**
+- Step-by-step intake: customer (duplicate detection by phone), device (IMEI validation), intake checklist, encrypted unlock code, customer signature, printable receipt and QR label.
+- Repair orders with priorities, technicians, promised dates, a Kanban board and an [enforced state machine](backend/docs/workflows/order-state-machine.md): no repair without an approved quote, no "ready" without the exit QA checklist, no delivery with an outstanding balance.
+- Versioned quotes (labor, parts, discounts, warranty, validity) approved or rejected by the customer from the portal; parts are reserved on approval.
+- Payments, deposits, refunds, Mercado Pago payment links, notes (internal or public), photos, message history, warranty certificates and warranty claims.
+- Repair suggestions from similar past orders and, optionally, diagnosis hypotheses from Claude (no personal data is sent).
 
-## Tech Stack
+**Sales and stock**
+- Point of sale: USB or camera barcode scanning, catalog by category, free items, line and global discounts, split payments with change, held sales, keyboard shortcuts, tickets and invoices.
+- Cash register shifts: opening float, income/expenses/withdrawals, per-method summary, bill counter, closing with differences and a PDF report.
+- Inventory with available vs. reserved stock, low-stock alerts, adjustments and counts, device compatibility, purchase orders with partial receiving and transfers between branches.
+- ARCA (AFIP) electronic invoices and credit notes; ARS/USD with daily exchange rates for reporting.
 
-### Backend
-
-- .NET 8 Web API
-- C#
-- Entity Framework Core
-- PostgreSQL
-- JWT Authentication
-- Docker Compose
-- xUnit
-- Clean Architecture style structure
-
-### Frontend
-
-- React
-- Vite
-- TypeScript
-- Tailwind CSS
-- Axios / API client layer
-
-### Infrastructure
-
-- Docker
-- PostgreSQL
-- Swagger / OpenAPI
-- Health checks
-
-## Architecture
-
-The backend is organized in layered projects:
-
-```txt
-backend/
-  src/
-    RepairShop.Api             # HTTP API, controllers, auth, middleware, Swagger
-    RepairShop.Application     # Use cases, contracts, services, abstractions
-    RepairShop.Domain          # Business entities and domain rules
-    RepairShop.Infrastructure  # Persistence, repositories, EF Core, security
-  tests/
-    RepairShop.Application.Tests
-    RepairShop.Domain.Tests
-```
-
-The frontend is organized as a React application:
-
-```txt
-frontend/
-  src/
-    api/          # API client and request types
-    auth/         # Authentication state and JWT handling
-    components/   # Shared UI components
-    pages/        # Business pages: dashboard, orders, customers, devices, inventory
-```
-
-Main flow:
-
-```txt
-User -> React Frontend -> .NET API -> Application Layer -> Domain Layer -> PostgreSQL
-```
+**Customers and management**
+- Public tracking portal: progress timeline, quote approval, online payment, warranty, satisfaction survey and WhatsApp contact.
+- Automatic messages from editable templates (WhatsApp via Twilio or Meta, email via SMTP) with an outbox that retries, pickup reminders and surveys.
+- Reports: revenue, margins, time per status (bottlenecks), quote approval rate, top issues and models, technicians, warranty re-entry rate, satisfaction and inventory value — exportable to Excel.
+- Multi-branch organizations, users invited by link, four roles (admin, technician, reception, cashier), audit log.
 
 ## Screenshots
 
-Current screenshots in `docs/screenshots/`:
+| | |
+| --- | --- |
+| ![Repair board](docs/screenshots/03-board.png) | ![Order detail](docs/screenshots/05-order-detail.png) |
+| Kanban board | Order with an approved quote |
+| ![Intake](docs/screenshots/06-new-order.png) | ![Point of sale](docs/screenshots/08-pos-checkout.png) |
+| Device intake | Point of sale checkout |
+| ![Cash register](docs/screenshots/09-cash.png) | ![Reports](docs/screenshots/11-reports.png) |
+| Cash register | Reports |
+| ![Message templates](docs/screenshots/12-message-templates.png) | <img src="docs/screenshots/13-customer-portal.png" alt="Customer portal" width="260"> |
+| Message templates with preview | Customer portal (mobile) |
 
-- Swagger API
-- Login
-- Dashboard
-- Customers
-- Devices
-- Orders
-- Inventory
+More in [`docs/screenshots`](docs/screenshots).
 
-![Swagger API](docs/screenshots/01-swagger-api.png)
-
-![Login](docs/screenshots/02-login.png)
-
-![Dashboard](docs/screenshots/03-dashboard.png)
-
-![Customers](docs/screenshots/04-customers.png)
-
-![Devices](docs/screenshots/05-devices.png)
-
-![Orders](docs/screenshots/06-orders.png)
-
-![Inventory](docs/screenshots/07-inventory.png)
-
-## Getting Started
-
-### Requirements
-
-- .NET 8 SDK
-- Node.js
-- npm
-- Docker Desktop
-
-## Run the Backend
-
-From the backend folder:
+## Architecture
 
 ```txt
+React SPA (Vite) ──/api/v1──▶ ASP.NET Core API ──▶ Application ──▶ Domain
+       ▲                           │                    │
+ public portal                  Infrastructure ◀────────┘
+                                   │  EF Core + PostgreSQL, outbox dispatcher, scheduled jobs,
+                                   │  PDF/QR, Excel, S3/R2 files, Mercado Pago, ARCA, Claude
+```
+
+```txt
+backend/
+  src/RepairShop.Domain          # Entities and business rules (state machine, quotes, sales, cash, stock)
+  src/RepairShop.Application     # Use cases, contracts, permissions, reports
+  src/RepairShop.Infrastructure  # EF Core/PostgreSQL, repositories, integrations, documents, jobs
+  src/RepairShop.Api             # Controllers, auth, validation, ProblemDetails, rate limiting
+  tests/                         # Domain, application and API integration tests (real PostgreSQL)
+frontend/
+  src/api        # Typed API client (in-memory access token, refresh cookie)
+  src/features   # Orders, customers, POS, cash, inventory, reports, settings, portal…
+  src/components # UI kit, charts, domain widgets
+  e2e/           # Playwright end-to-end tests
+```
+
+Key decisions:
+- **Clean Architecture** with business rules in the domain and a global tenant filter per branch.
+- **Security**: 15-minute JWT kept in memory + rotating refresh token in an httpOnly cookie with reuse detection; login rate limiting and lockout; secrets encrypted with Data Protection; signed URLs for files; audit log.
+- **Reliability**: idempotency keys on payments and sales, optimistic concurrency (PostgreSQL `xmin`) on orders, stock and cash, a message outbox with automatic retries, background jobs coordinated with advisory locks.
+- **Operations**: structured logging with correlation ids, `/healthz` and `/readyz`, OpenTelemetry, a Docker image, automatic migrations (including an upgrade path for older databases).
+
+## Getting started
+
+Requirements: .NET 8 SDK, Node.js 20+, and Docker (or a local PostgreSQL 13+).
+
+```bash
+# API + PostgreSQL with demo data
 cd backend
-dotnet restore
-dotnet build
-dotnet test
-```
-
-To start the API with PostgreSQL using Docker Compose:
-
-```txt
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
-```
 
-API endpoints:
-
-```txt
-API:     http://localhost:8080
-Health:  http://localhost:8080/healthz
-Ready:   http://localhost:8080/readyz
-Swagger: http://localhost:8080/swagger
-```
-
-## Run the Frontend
-
-From the frontend folder:
-
-```txt
+# Web app (another terminal)
 cd frontend
-npm install
-npm run dev -- --host 127.0.0.1
+npm ci
+npm run dev
 ```
 
-Frontend URL:
+Open http://localhost:5173 and sign in with a demo user:
 
-```txt
-http://127.0.0.1:5173
+| Role | Email | Password |
+| --- | --- | --- |
+| Admin | `admin@local` | `Admin123456` |
+| Technician | `tech@local` | `Tech123456` |
+| Reception | `recepcion@local` | `Recepcion123` |
+| Cashier | `caja@local` | `Caja123456` |
+
+API: http://localhost:8080 · Swagger: http://localhost:8080/swagger · Health: `/healthz`, `/readyz`.
+
+Configuration, integrations and production deployment are documented in the [backend README](backend/README.md) and the [frontend README](frontend/README.md). Example configuration files: `backend/.env.example`, `backend/src/RepairShop.Api/appsettings.Example.json`, `frontend/.env.example`. Never commit real secrets.
+
+## Tests and CI
+
+```bash
+# Backend: unit tests + API integration tests against PostgreSQL
+cd backend
+REPAIRSHOP_TEST_CONNECTION="Host=localhost;Port=5432;Username=postgres;Password=postgres" dotnet test
+
+# Frontend: lint, unit/component tests, production build
+cd frontend
+npm run lint && npm test && npm run build
+
+# End-to-end (needs the API running with demo data)
+npm run test:e2e
 ```
 
-## Seed Login
+GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs the backend build and tests with a PostgreSQL service, the frontend checks, the Docker image build and the Playwright end-to-end suite (reception to delivery, point of sale and cash, purchasing and transfers, customer portal, role permissions and a smoke pass over every screen).
 
-Development-only seed user:
+## Tech stack
 
-```txt
-Email:    admin@local
-Password: Admin12345
-```
-
-This user is intended only for local development and demo purposes.
-
-## Environment Variables
-
-This repository includes example configuration files only.
-
-Root example:
-
-```txt
-.env.example
-```
-
-Backend examples:
-
-```txt
-backend/.env.example
-backend/src/RepairShop.Api/appsettings.Example.json
-```
-
-Frontend examples:
-
-```txt
-frontend/.env.example
-frontend/.env.production.example
-```
-
-Do not commit real secrets, local database passwords or production JWT keys.
-
-## Validation Status
-
-Current validation status:
-
-```txt
-Backend restore: OK
-Backend build: OK
-Backend tests: OK
-Tests passing: 8
-Docker API + PostgreSQL: OK
-GET /healthz: 200
-GET /readyz: 200
-GET /swagger: 200
-Frontend dev server: OK
-Frontend login through proxy: OK
-Seed admin login: OK
-```
-
-The current version builds successfully, passes backend tests and runs locally with Docker, PostgreSQL and the React frontend.
-
-## Business Value
-
-This project demonstrates how internal software can reduce operational disorder in a repair shop.
-
-Instead of tracking repairs manually through chats or spreadsheets, the shop gets a structured system for:
-
-- Customer records.
-- Device records.
-- Repair order tracking.
-- Status history.
-- Inventory usage.
-- Payments.
-- Message templates.
-- Operational visibility.
-
-This project can be adapted for businesses that need to organize service orders, track operational workflows and reduce manual administrative work.
-
-## Project Status
-
-Portfolio-ready base version.
-
-The current version includes a working backend, frontend, PostgreSQL setup, Docker Compose configuration, authentication, business entities and automated backend tests.
+- **Backend**: .NET 8, ASP.NET Core, EF Core 8, PostgreSQL 16, FluentValidation, Serilog, OpenTelemetry, QuestPDF, QRCoder, ClosedXML, MailKit, AWS SDK (S3/R2), Anthropic SDK, xUnit.
+- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, TanStack Query, React Router, dnd-kit, Vitest, Testing Library, Playwright. Installable PWA.
+- **Infrastructure**: Docker, Docker Compose, GitHub Actions.
