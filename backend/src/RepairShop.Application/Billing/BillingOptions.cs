@@ -69,6 +69,24 @@ public sealed class PaddleBillingOptions
                                 && !string.IsNullOrWhiteSpace(WebhookSecret)
                                 && Plans.All.All(p => PriceIds.TryGetValue(p.Id.ToString(), out var id) && !string.IsNullOrWhiteSpace(id));
 
+    /// <summary>
+    /// Describes keys that belong to the other Paddle environment (live keys with Environment=sandbox or the
+    /// other way round), which Paddle rejects with 403; null when they match or carry no recognizable prefix.
+    /// </summary>
+    public string? EnvironmentMismatch()
+    {
+        var expectedKey = IsProduction ? "pdl_live_" : "pdl_sdbx_";
+        var otherKey = IsProduction ? "pdl_sdbx_" : "pdl_live_";
+        var expectedToken = IsProduction ? "live_" : "test_";
+        var otherToken = IsProduction ? "test_" : "live_";
+        var env = IsProduction ? "production" : "sandbox";
+        if (ApiKey.Trim().StartsWith(otherKey, StringComparison.Ordinal))
+            return $"PADDLE_API_KEY starts with {otherKey} but PADDLE_ENVIRONMENT is {env} (expected {expectedKey}...)";
+        if (ClientToken.Trim().StartsWith(otherToken, StringComparison.Ordinal))
+            return $"PADDLE_CLIENT_TOKEN starts with {otherToken} but PADDLE_ENVIRONMENT is {env} (expected {expectedToken}...)";
+        return null;
+    }
+
     public string? PriceIdFor(PlanId plan) => PriceIds.TryGetValue(plan.ToString(), out var id) && !string.IsNullOrWhiteSpace(id) ? id.Trim() : null;
 
     public PlanId? PlanForPriceId(string? priceId)
