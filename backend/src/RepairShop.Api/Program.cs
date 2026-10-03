@@ -60,6 +60,7 @@ builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = 20 * 1
 builder.Services
     .AddControllers(options =>
     {
+        options.Filters.Add<RepairShop.Api.Billing.SubscriptionGateFilter>();
         var m = options.ModelBindingMessageProvider;
         m.SetAttemptedValueIsInvalidAccessor((value, field) => $"El valor '{value}' no es válido para {field}.");
         m.SetMissingBindRequiredValueAccessor(field => $"Falta el valor de {field}.");

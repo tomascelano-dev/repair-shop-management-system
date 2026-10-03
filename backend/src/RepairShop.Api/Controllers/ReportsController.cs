@@ -1,15 +1,18 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RepairShop.Api.Billing;
 using RepairShop.Api.Common;
 using RepairShop.Api.Security;
 using RepairShop.Application.Contracts;
 using RepairShop.Application.Reports;
+using RepairShop.Domain.Billing;
 
 namespace RepairShop.Api.Controllers;
 
 /// <summary>Management reports. Amounts are reported per currency and converted with the rate of each day.</summary>
 [ApiController]
 [Route("api/v1/reports")]
+[RequiresModule(PlanModules.Reports)]
 [Authorize(Policy = Policies.Reports)]
 public sealed class ReportsController : ControllerBase
 {

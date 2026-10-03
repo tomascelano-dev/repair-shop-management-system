@@ -1,15 +1,18 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RepairShop.Api.Billing;
 using RepairShop.Api.Common;
 using RepairShop.Api.Security;
 using RepairShop.Application.Abstractions;
 using RepairShop.Application.Contracts;
+using RepairShop.Domain.Billing;
 
 namespace RepairShop.Api.Controllers;
 
 /// <summary>Who did what and when (orders, payments, cash, stock, users, settings...).</summary>
 [ApiController]
 [Route("api/v1/audit")]
+[RequiresModule(PlanModules.Audit)]
 [Authorize(Policy = Policies.AdminOnly)]
 public sealed class AuditController : ControllerBase
 {

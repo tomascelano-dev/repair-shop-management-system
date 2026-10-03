@@ -202,6 +202,7 @@ public sealed class AuthService
 
         PasswordPolicy.Validate(req.NewPassword);
         user.ChangePassword(_hasher.Hash(req.NewPassword), now);
+        user.MarkEmailVerified(now); // the link reached the inbox
         foreach (var t in await _refreshTokens.ListActiveByUserAsync(user.Id, now, ct)) t.Revoke("password_reset", now);
         await _uow.SaveChangesAsync(ct);
     }
@@ -217,12 +218,53 @@ public sealed class AuthService
         PasswordPolicy.Validate(req.Password);
         if (!string.IsNullOrWhiteSpace(req.DisplayName)) user.UpdateProfile(req.DisplayName, user.Role, now);
         user.ChangePassword(_hasher.Hash(req.Password), now);
+        user.MarkEmailVerified(now); // the invitation reached the inbox
         user.RegisterLogin(now);
 
         var shops = await GetAccessibleShopsAsync(user, ct);
         var target = shops.FirstOrDefault(s => s.IsHome) ?? shops.FirstOrDefault()
                      ?? throw new UnauthorizedException("Tu usuario no tiene sucursales activas.");
         return await IssueAsync(user, target, shops, Guid.Empty, ip, userAgent, ct);
+    }
+
+    /// <summary>Opens a session for a user that was just created (self-service signup).</summary>
+    public async Task<AuthResult> SignInAsync(AppUser user, string? ip, string? userAgent, CancellationToken ct)
+    {
+        var shops = await GetAccessibleShopsAsync(user, ct);
+        var target = shops.FirstOrDefault(s => s.IsHome) ?? throw new UnauthorizedException("Tu usuario no tiene sucursales activas.");
+        user.RegisterLogin(_clock.UtcNow);
+        return await IssueAsync(user, target, shops, Guid.Empty, ip, userAgent, ct);
+    }
+
+    public async Task VerifyEmailAsync(string? rawToken, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(rawToken)) throw new DomainException("El link es inválido.");
+        var user = await _users.GetByEmailVerificationTokenHashAsync(TokenHasher.Hash(rawToken), ct)
+                   ?? throw new DomainException("El link es inválido o ya fue usado.");
+        user.VerifyEmail(TokenHasher.Hash(rawToken), _clock.UtcNow);
+        await _uow.SaveChangesAsync(ct);
+    }
+
+    public async Task ResendEmailVerificationAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await _users.GetByIdAsync(userId, ct) ?? throw new UnauthorizedException("Sesión inválida.");
+        if (user.IsEmailVerified) return;
+        await QueueEmailVerificationAsync(user, ct);
+        await _uow.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Stores a fresh verification token on the user and queues the email (caller saves).</summary>
+    public async Task QueueEmailVerificationAsync(AppUser user, CancellationToken ct)
+    {
+        var now = _clock.UtcNow;
+        var raw = TokenHasher.NewToken();
+        user.RequestEmailVerification(TokenHasher.Hash(raw), now);
+        var body = $"Hola {user.DisplayName},\n\nConfirmá tu email para terminar de crear tu cuenta de RepairShop:\n{_links.VerifyEmail(raw)}\n\n" +
+                   "Si no creaste una cuenta, ignorá este mensaje.";
+        var item = new NotificationOutboxItem(user.ShopId, NotificationChannel.Email, user.Email, "Confirmá tu email", body,
+            OutboxStatus.Pending, $"user:{user.Id}:verify:{now:yyyyMMddHHmmss}", "user", user.Id, now);
+        item.SetOrigin("auth.email.verify", null);
+        await _outbox.AddAsync(item, ct);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -295,7 +337,7 @@ public sealed class AuthService
     }
 
     private static UserResponse ToUserResponse(AppUser user, ShopAccessInfo shop, Shop? shopEntity)
-        => new(user.Id, shop.ShopId, user.Email, user.DisplayName, shop.Role.ToString(), shopEntity?.Name ?? shop.ShopName, shop.OrganizationId);
+        => new(user.Id, shop.ShopId, user.Email, user.DisplayName, shop.Role.ToString(), shopEntity?.Name ?? shop.ShopName, shop.OrganizationId, user.IsEmailVerified);
 }
 
 public sealed record ShopAccessInfo(Guid ShopId, string ShopName, Guid OrganizationId, UserRole Role, bool IsHome)

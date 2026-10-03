@@ -56,6 +56,9 @@ public sealed class UserRepository : IUserRepository
     public Task<AppUser?> GetByPendingTokenHashAsync(string tokenHash, CancellationToken ct)
         => _db.Users.FirstOrDefaultAsync(x => x.PendingTokenHash == tokenHash, ct);
 
+    public Task<AppUser?> GetByEmailVerificationTokenHashAsync(string tokenHash, CancellationToken ct)
+        => _db.Users.FirstOrDefaultAsync(x => x.EmailVerificationTokenHash == tokenHash, ct);
+
     public Task<List<AppUser>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
         => _db.Users.Where(x => ids.Contains(x.Id)).ToListAsync(ct);
 

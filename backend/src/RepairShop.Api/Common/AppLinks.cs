@@ -30,5 +30,7 @@ public sealed class AppLinks : IAppLinks
     public string Invitation(string token) => $"{_web}/invitacion?token={Uri.EscapeDataString(token)}";
     public string PasswordReset(string token) => $"{_web}/restablecer?token={Uri.EscapeDataString(token)}";
     public string Order(Guid orderId) => $"{_web}/orders/{orderId}";
+    public string VerifyEmail(string token) => $"{_web}/verificar-email?token={Uri.EscapeDataString(token)}";
+    public string Billing() => $"{_web}/billing";
     public string ApiBase => _api;
 }

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using RepairShop.Api.Billing;
 using RepairShop.Api.Common;
 using RepairShop.Api.Security;
 using RepairShop.Application.Abstractions;
@@ -7,6 +8,7 @@ using RepairShop.Application.Contracts;
 using RepairShop.Application.Documents;
 using RepairShop.Application.RepairOrders;
 using RepairShop.Application.Suggestions;
+using RepairShop.Domain.Billing;
 using RepairShop.Domain.RepairOrders;
 
 namespace RepairShop.Api.Controllers;
@@ -171,7 +173,10 @@ public sealed class OrdersController : ControllerBase
     [HttpGet("{id:guid}/suggestions")]
     [Authorize(Policy = Policies.OrdersWork)]
     public async Task<ActionResult<ApiResponse<RepairSuggestionResponse>>> Suggestions([FromServices] SuggestionService suggestions, Guid id, [FromQuery] bool ai = false, CancellationToken ct = default)
-        => Ok(Envelope.Ok(await suggestions.GetAsync(CurrentUser.GetShopId(User), id, ai, ct)));
+    {
+        if (ai && SubscriptionGateFilter.Current(HttpContext) is { } access) SubscriptionGateFilter.EnsureModule(access, PlanModules.Ai);
+        return Ok(Envelope.Ok(await suggestions.GetAsync(CurrentUser.GetShopId(User), id, ai, ct)));
+    }
 
     // ===== Printable documents (PDF) =====
 
