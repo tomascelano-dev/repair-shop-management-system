@@ -5,6 +5,7 @@ import { RequireAuth, RequirePermission } from './auth/guards'
 import { AppLayout } from './components/layout/AppLayout'
 import { Loading } from './components/ui'
 import { AcceptInvitationPage, ForgotPasswordPage, LoginPage, ResetPasswordPage } from './features/auth/AuthPages'
+import { SiteEffects } from './features/public/SiteEffects'
 
 // Route-level code splitting: each section downloads only when it is opened.
 function page<K extends string>(loader: () => Promise<Record<K, ComponentType>>, name: K) {
@@ -34,6 +35,7 @@ const BillingPage = page(() => import('./features/billing/BillingPage'), 'Billin
 const SignupPage = page(() => import('./features/public/SignupPage'), 'SignupPage')
 const VerifyEmailPage = page(() => import('./features/public/SignupPage'), 'VerifyEmailPage')
 const PricingPage = page(() => import('./features/public/PricingPage'), 'PricingPage')
+const LandingPage = page(() => import('./features/public/LandingPage'), 'LandingPage')
 const TermsPage = page(() => import('./features/public/LegalPages'), 'TermsPage')
 const PrivacyPage = page(() => import('./features/public/LegalPages'), 'PrivacyPage')
 const RefundPage = page(() => import('./features/public/LegalPages'), 'RefundPage')
@@ -45,6 +47,7 @@ function Guard({ permission, children }: { permission: Permission; children: Rea
 export default function App() {
   return (
     <Suspense fallback={<Loading />}>
+      <SiteEffects />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/olvide" element={<ForgotPasswordPage />} />
@@ -57,6 +60,12 @@ export default function App() {
         <Route path="/terminos" element={<TermsPage />} />
         <Route path="/privacidad" element={<PrivacyPage />} />
         <Route path="/reembolsos" element={<RefundPage />} />
+        <Route path="/en" element={<LandingPage />} />
+        <Route path="/en/pricing" element={<PricingPage />} />
+        <Route path="/en/terms" element={<TermsPage />} />
+        <Route path="/en/privacy" element={<PrivacyPage />} />
+        <Route path="/en/refunds" element={<RefundPage />} />
+        <Route path="/en/signup" element={<SignupPage />} />
 
         <Route
           element={

@@ -50,12 +50,23 @@ export function browserTimeZone(): string | undefined {
   }
 }
 
+/** Language of the public website (the app itself is in Spanish). */
+type Lang = 'es' | 'en'
+
 export const MODULE_LABEL: Record<string, string> = {
   purchasing: 'Compras y proveedores',
   reports: 'Reportes detallados y Excel',
   transfers: 'Transferencias entre sucursales',
   audit: 'Auditoría de cambios',
   ai: 'Sugerencias de diagnóstico con IA',
+}
+
+const MODULE_LABEL_EN: Record<string, string> = {
+  purchasing: 'Purchasing and suppliers',
+  reports: 'Detailed reports and Excel export',
+  transfers: 'Transfers between branches',
+  audit: 'Change history (audit log)',
+  ai: 'AI diagnosis suggestions',
 }
 
 /** What every plan includes, shown above the per-plan extras. */
@@ -67,7 +78,23 @@ export const CORE_FEATURES = [
   'Usuarios ilimitados',
 ]
 
-export function planFeatures(plan: Plan): string[] {
+const CORE_FEATURES_EN = [
+  'Repair orders, quotes and a workshop board',
+  'Customer portal with status tracking and quote approval',
+  'Point of sale, cash register and inventory',
+  'WhatsApp, email and SMS notifications',
+  'Unlimited users',
+]
+
+export function coreFeatures(lang: Lang = 'es'): string[] {
+  return lang === 'en' ? CORE_FEATURES_EN : CORE_FEATURES
+}
+
+export function planFeatures(plan: Plan, lang: Lang = 'es'): string[] {
+  if (lang === 'en') {
+    const branches = plan.maxBranches === 1 ? '1 branch' : `Up to ${plan.maxBranches} branches`
+    return [branches, ...plan.modules.map((m) => MODULE_LABEL_EN[m] ?? m)]
+  }
   const branches = plan.maxBranches === 1 ? '1 sucursal' : `Hasta ${plan.maxBranches} sucursales`
   return [branches, ...plan.modules.map((m) => MODULE_LABEL[m] ?? m)]
 }
@@ -76,6 +103,35 @@ export const PLAN_TAGLINE: Record<PlanId, string> = {
   Basic: 'Para el taller que arranca',
   Standard: 'Para el taller con stock y proveedores',
   Pro: 'Para cadenas y talleres grandes',
+}
+
+const PLAN_TAGLINE_EN: Record<PlanId, string> = {
+  Basic: 'For a shop that is getting started',
+  Standard: 'For shops with stock and suppliers',
+  Pro: 'For chains and large shops',
+}
+
+const PLAN_NAME_EN: Record<PlanId, string> = { Basic: 'Basic', Standard: 'Standard', Pro: 'Professional' }
+
+export function planTagline(plan: Plan, lang: Lang = 'es'): string {
+  return (lang === 'en' ? PLAN_TAGLINE_EN : PLAN_TAGLINE)[plan.id]
+}
+
+export function planName(plan: Plan, lang: Lang = 'es'): string {
+  return lang === 'en' ? PLAN_NAME_EN[plan.id] : plan.name
+}
+
+/** Countries for a select, named in the page's language ("Otro país" / "Other country" last). */
+export function countryOptions(lang: Lang = 'es'): { code: string; name: string }[] {
+  if (lang === 'es') return COUNTRIES
+  let names: Intl.DisplayNames | null = null
+  try {
+    names = new Intl.DisplayNames(['en'], { type: 'region' })
+  } catch {
+    names = null
+  }
+  const named = COUNTRIES.filter((c) => c.code !== 'OT').map((c) => ({ code: c.code, name: names?.of(c.code) ?? c.name }))
+  return [...named.sort((a, b) => a.name.localeCompare(b.name, 'en')), { code: 'OT', name: 'Other country' }]
 }
 
 export const SUBSCRIPTION_STATUS: Record<SubscriptionStatus, { label: string; tone: Tone }> = {

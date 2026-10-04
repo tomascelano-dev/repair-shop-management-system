@@ -204,6 +204,118 @@ public sealed class BillingTests
         config.Str("paddleClientToken").Should().Be("test_client_token");
     }
 
+    [IntegrationFact]
+    public async Task Public_config_lists_only_well_formed_tag_ids_and_the_visitor_country()
+    {
+        var anon = _factory.CreateClient();
+        var req = new HttpRequestMessage(HttpMethod.Get, "/api/v1/billing/config");
+        req.Headers.Add("CF-IPCountry", "es");
+        var config = await (await anon.SendAsync(req)).DataAsync();
+        var tracking = config.GetProperty("tracking");
+        tracking.Str("ga4Id").Should().Be("G-TEST123");
+        tracking.Str("googleAdsId").Should().Be("AW-111222333");
+        tracking.GetProperty("googleAdsSignupLabel").ValueKind.Should().Be(JsonValueKind.Null, "a malformed id never reaches a script URL");
+        tracking.Str("metaPixelId").Should().Be("1234567890");
+        config.Str("visitorCountry").Should().Be("ES");
+        config.ToString().Should().NotContain("meta-test-token");
+
+        var unknown = await (await anon.GetAsync("/api/v1/billing/config")).DataAsync();
+        unknown.GetProperty("visitorCountry").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [IntegrationFact]
+    public async Task A_signup_from_an_ad_keeps_its_campaign_and_queues_the_trial_conversion_only_with_consent()
+    {
+        var withConsent = await SignupWithAttributionAsync(adConsent: true, "evt-trial-1");
+        var attribution = await QueryRowAsync("SELECT \"Source\", \"Campaign\", \"Gclid\", \"LandingPath\", \"AdConsent\" FROM signup_attributions WHERE \"OrganizationId\" = @o", withConsent);
+        attribution.Should().Equal("google", "talleres-mx", "click-123", "/", true);
+
+        var trial = await QueryRowAsync("SELECT \"EventName\", \"EventId\", \"Payload\" FROM ad_conversions WHERE \"OrganizationId\" = @o", withConsent);
+        trial[0].Should().Be("StartTrial");
+        trial[1].Should().Be("evt-trial-1");
+        var payload = JsonDocument.Parse((string)trial[2]!).RootElement;
+        payload.Str("action_source").Should().Be("website");
+        payload.GetProperty("user_data").GetProperty("em")[0].GetString().Should().MatchRegex("^[0-9a-f]{64}$", "the email is sent hashed");
+        payload.GetProperty("user_data").GetProperty("fbc").GetString().Should().StartWith("fb.1.").And.EndWith(".fb-click");
+
+        var withoutConsent = await SignupWithAttributionAsync(adConsent: false, "evt-trial-2");
+        (await QueryRowAsync("SELECT count(*) FROM ad_conversions WHERE \"OrganizationId\" = @o", withoutConsent))[0].Should().Be(0L);
+        (await QueryRowAsync("SELECT \"Campaign\" FROM signup_attributions WHERE \"OrganizationId\" = @o", withoutConsent))[0].Should().Be("talleres-mx");
+    }
+
+    [IntegrationFact]
+    public async Task The_first_payment_queues_one_purchase_conversion_with_the_id_the_website_reports()
+    {
+        var org = await SignupWithAttributionAsync(adConsent: true, $"evt-{Guid.NewGuid():N}");
+        var anon = _factory.CreateClient();
+        string Event(string id, string type, int offsetMs) => JsonSerializer.Serialize(new
+        {
+            event_id = id,
+            event_type = type,
+            occurred_at = DateTime.UtcNow.AddMilliseconds(offsetMs).ToString("O"),
+            data = new
+            {
+                id = $"sub_conv_{org:N}",
+                status = "active",
+                customer_id = "ctm_conv",
+                currency_code = "USD",
+                custom_data = new { organization_id = org.ToString(), plan = "Standard" },
+                current_billing_period = new { starts_at = DateTime.UtcNow.ToString("O"), ends_at = DateTime.UtcNow.AddMonths(1).ToString("O") },
+                items = new[] { new { price = new { id = "pri_standard", unit_price = new { amount = "4500", currency_code = "USD" } } } }
+            }
+        });
+
+        (await PostPaddleAsync(anon, Event("evt_c1", "subscription.created", 0), ApiFactory.PaddleWebhookSecret)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await PostPaddleAsync(anon, Event("evt_c2", "subscription.updated", 50), ApiFactory.PaddleWebhookSecret)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var purchase = await QueryRowAsync("SELECT count(*), max(\"EventId\"), max(\"Payload\") FROM ad_conversions WHERE \"OrganizationId\" = @o AND \"EventName\" = 'Purchase'", org);
+        purchase[0].Should().Be(1L, "renewals and repeated events are not new purchases");
+        purchase[1].Should().Be($"purchase_sub_conv_{org:N}");
+        var data = JsonDocument.Parse((string)purchase[2]!).RootElement.GetProperty("custom_data");
+        data.GetProperty("value").GetDecimal().Should().Be(45m);
+        data.Str("currency").Should().Be("USD");
+    }
+
+    private async Task<Guid> SignupWithAttributionAsync(bool adConsent, string eventId)
+    {
+        var http = _factory.CreateClient();
+        var res = await http.PostAsJsonAsync("/api/v1/auth/signup", new
+        {
+            shopName = "Taller anuncio",
+            ownerName = "Dueño Anuncio",
+            email = $"ads{Guid.NewGuid():N}"[..20] + "@example.com",
+            password = "Clave12345",
+            country = "MX",
+            acceptTerms = true,
+            attribution = new
+            {
+                utmSource = "google",
+                utmMedium = "cpc",
+                utmCampaign = "talleres-mx",
+                gclid = "click-123",
+                fbclid = "fb-click",
+                landingPath = "/",
+                adConsent,
+                eventId
+            }
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        return Guid.Parse((await res.DataAsync()).GetProperty("user").Str("organizationId"));
+    }
+
+    private async Task<object?[]> QueryRowAsync(string sql, Guid organizationId)
+    {
+        await using var conn = new NpgsqlConnection(_factory.ConnectionString);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("o", organizationId);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        (await reader.ReadAsync()).Should().BeTrue();
+        var row = new object?[reader.FieldCount];
+        for (var i = 0; i < row.Length; i++) row[i] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+        return row;
+    }
+
     private async Task EndTrialAsync(JsonElement login)
     {
         await using var conn = new NpgsqlConnection(_factory.ConnectionString);

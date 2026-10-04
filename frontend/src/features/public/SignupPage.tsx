@@ -5,12 +5,65 @@ import { authApi, billingApi } from '../../api/endpoints'
 import { errorMessage, fieldErrors } from '../../api/http'
 import { useSession } from '../../auth/session'
 import { Alert, Button, Checkbox, Field, Input, Loading, Select } from '../../components/ui'
-import { billingCountry, browserTimeZone, COUNTRIES, detectCountry } from '../../lib/billing'
+import { signupAttribution } from '../../lib/attribution'
+import { billingCountry, browserTimeZone, countryOptions, detectCountry } from '../../lib/billing'
+import { adsAllowed, trackSignup } from '../../lib/tracking'
 import { AuthCard } from '../auth/AuthPages'
+import { PUBLIC_ROUTES, useLang } from './lang'
+
+const TEXT = {
+  es: {
+    closedTitle: 'Crear cuenta',
+    closed: 'Por ahora el alta de talleres está cerrada. Vuelve a intentarlo en unos días.',
+    haveAccount: 'Ya tengo cuenta',
+    title: (days: number) => `Prueba gratis ${days} días`,
+    subtitle: 'Sin tarjeta. Todos los módulos incluidos.',
+    shopName: 'Nombre del taller',
+    ownerName: 'Tu nombre',
+    email: 'Email',
+    password: 'Contraseña',
+    passwordHint: 'Mínimo 8 caracteres, con letras y números.',
+    country: 'País',
+    accept: 'Acepto los',
+    terms: 'Términos',
+    and: 'y la',
+    privacy: 'Política de privacidad',
+    submit: 'Crear mi cuenta',
+    already: '¿Ya tienes cuenta?',
+    login: 'Ingresar',
+    prices: 'Ver precios',
+    appNote: '',
+  },
+  en: {
+    closedTitle: 'Create account',
+    closed: 'Signups are closed for now. Please try again in a few days.',
+    haveAccount: 'I already have an account',
+    title: (days: number) => `Try it free for ${days} days`,
+    subtitle: 'No credit card. Every module included.',
+    shopName: 'Shop name',
+    ownerName: 'Your name',
+    email: 'Email',
+    password: 'Password',
+    passwordHint: 'At least 8 characters, with letters and numbers.',
+    country: 'Country',
+    accept: 'I accept the',
+    terms: 'Terms of Service',
+    and: 'and the',
+    privacy: 'Privacy Policy',
+    submit: 'Create my account',
+    already: 'Already have an account?',
+    login: 'Log in',
+    prices: 'See pricing',
+    appNote: 'The app is in Spanish for now.',
+  },
+}
 
 export function SignupPage() {
   const { state, acceptSession } = useSession()
   const navigate = useNavigate()
+  const lang = useLang()
+  const t = TEXT[lang]
+  const routes = PUBLIC_ROUTES[lang]
   const config = useQuery({ queryKey: ['billing-config'], queryFn: billingApi.config, staleTime: 5 * 60_000 })
   const [form, setForm] = useState({ shopName: '', ownerName: '', email: '', password: '', country: detectCountry(), acceptTerms: false })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -27,6 +80,7 @@ export function SignupPage() {
     setErrors({})
     setLoading(true)
     try {
+      const attribution = signupAttribution(adsAllowed())
       const session = await authApi.signup({
         shopName: form.shopName.trim(),
         ownerName: form.ownerName.trim(),
@@ -35,7 +89,9 @@ export function SignupPage() {
         country: billingCountry(form.country),
         timeZone: browserTimeZone(),
         acceptTerms: form.acceptTerms,
+        attribution,
       })
+      trackSignup(attribution.eventId)
       acceptSession(session)
       navigate('/?bienvenida=1', { replace: true })
     } catch (err) {
@@ -51,11 +107,11 @@ export function SignupPage() {
 
   if (config.data && !config.data.signupEnabled) {
     return (
-      <AuthCard title="Crear cuenta">
-        <Alert tone="amber">Por ahora el alta de talleres está cerrada. Volvé a intentar en unos días.</Alert>
+      <AuthCard title={t.closedTitle}>
+        <Alert tone="amber">{t.closed}</Alert>
         <p className="mt-4 text-center text-sm">
           <Link to="/login" className="text-brand-700 hover:underline">
-            Ya tengo cuenta
+            {t.haveAccount}
           </Link>
         </p>
       </AuthCard>
@@ -63,23 +119,23 @@ export function SignupPage() {
   }
 
   return (
-    <AuthCard title={`Probá gratis ${trialDays} días`} subtitle="Sin tarjeta. Todos los módulos incluidos.">
+    <AuthCard title={t.title(trialDays)} subtitle={t.subtitle}>
       <form onSubmit={submit} className="space-y-4" noValidate>
-        <Field label="Nombre del taller" error={errors.shopName}>
+        <Field label={t.shopName} error={errors.shopName}>
           <Input value={form.shopName} onChange={(e) => set('shopName', e.target.value)} autoComplete="organization" required autoFocus />
         </Field>
-        <Field label="Tu nombre" error={errors.ownerName}>
+        <Field label={t.ownerName} error={errors.ownerName}>
           <Input value={form.ownerName} onChange={(e) => set('ownerName', e.target.value)} autoComplete="name" required />
         </Field>
-        <Field label="Email" error={errors.email}>
+        <Field label={t.email} error={errors.email}>
           <Input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} autoComplete="email" required />
         </Field>
-        <Field label="Contraseña" hint="Mínimo 8 caracteres, con letras y números." error={errors.password}>
+        <Field label={t.password} hint={t.passwordHint} error={errors.password}>
           <Input type="password" value={form.password} onChange={(e) => set('password', e.target.value)} autoComplete="new-password" required />
         </Field>
-        <Field label="País" error={errors.country}>
+        <Field label={t.country} error={errors.country}>
           <Select value={form.country} onChange={(e) => set('country', e.target.value)}>
-            {COUNTRIES.map((c) => (
+            {countryOptions(lang).map((c) => (
               <option key={c.code} value={c.code}>
                 {c.name}
               </option>
@@ -91,13 +147,13 @@ export function SignupPage() {
           onChange={(e) => set('acceptTerms', e.target.checked)}
           label={
             <>
-              Acepto los{' '}
-              <Link to="/terminos" target="_blank" className="text-brand-700 underline">
-                Términos
+              {t.accept}{' '}
+              <Link to={routes.terms} target="_blank" className="text-brand-700 underline">
+                {t.terms}
               </Link>{' '}
-              y la{' '}
-              <Link to="/privacidad" target="_blank" className="text-brand-700 underline">
-                Política de privacidad
+              {t.and}{' '}
+              <Link to={routes.privacy} target="_blank" className="text-brand-700 underline">
+                {t.privacy}
               </Link>
             </>
           }
@@ -110,16 +166,17 @@ export function SignupPage() {
           loading={loading}
           disabled={!form.shopName || !form.ownerName || !form.email || !form.password || !form.acceptTerms}
         >
-          Crear mi cuenta
+          {t.submit}
         </Button>
+        {t.appNote ? <p className="text-center text-xs text-slate-500">{t.appNote}</p> : null}
         <p className="text-center text-sm text-slate-600">
-          ¿Ya tenés cuenta?{' '}
+          {t.already}{' '}
           <Link to="/login" className="text-brand-700 hover:underline">
-            Ingresar
+            {t.login}
           </Link>
           {' · '}
-          <Link to="/precios" className="text-brand-700 hover:underline">
-            Ver precios
+          <Link to={routes.pricing} className="text-brand-700 hover:underline">
+            {t.prices}
           </Link>
         </p>
       </form>

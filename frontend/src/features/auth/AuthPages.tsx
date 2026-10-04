@@ -6,6 +6,7 @@ import { authApi } from '../../api/endpoints'
 import { errorMessage } from '../../api/http'
 import { useSession } from '../../auth/session'
 import { Alert, Button, Field, Input, Loading } from '../../components/ui'
+import { LegalLinks } from '../public/PublicLayout'
 
 export function AuthCard({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
@@ -20,26 +21,10 @@ export function AuthCard({ title, subtitle, children }: { title: string; subtitl
         </div>
         {children}
       </div>
-      <nav aria-label="Legales" className="mt-4 text-center text-xs text-slate-400">
-        {LEGAL_LINKS.map((l, i) => (
-          <span key={l.to}>
-            {i > 0 && ' · '}
-            <Link to={l.to} className="hover:text-white hover:underline">
-              {l.label}
-            </Link>
-          </span>
-        ))}
-      </nav>
+      <LegalLinks className="mt-4 text-center text-xs text-slate-400" />
     </div>
   )
 }
-
-const LEGAL_LINKS = [
-  { to: '/precios', label: 'Precios' },
-  { to: '/terminos', label: 'Términos' },
-  { to: '/privacidad', label: 'Privacidad' },
-  { to: '/reembolsos', label: 'Reembolsos' },
-]
 
 const DEMO_USERS = [
   { email: 'admin@local', password: 'Admin123456', role: 'Administrador' },

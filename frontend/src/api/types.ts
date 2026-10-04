@@ -1179,6 +1179,18 @@ export interface BillingConfig {
   contactEmail: string | null
   /** Seller shown in the Terms; null until the platform sets LEGAL_NAME. */
   legalName: string | null
+  /** Ad measurement tags configured on the server (each null when not set). */
+  tracking: TrackingConfig
+  /** Visitor's country as Cloudflare reports it (decides the cookie consent rules); null when unknown. */
+  visitorCountry: string | null
+}
+
+export interface TrackingConfig {
+  ga4Id: string | null
+  googleAdsId: string | null
+  googleAdsSignupLabel: string | null
+  googleAdsPurchaseLabel: string | null
+  metaPixelId: string | null
 }
 
 export interface Subscription {
@@ -1202,6 +1214,8 @@ export interface Subscription {
   checkoutAvailable: boolean
   emailVerified: boolean
   plans: Plan[]
+  /** Id of the purchase conversion while a paid subscription runs (shared with the server's copy); null otherwise. */
+  conversionId: string | null
 }
 
 export interface CheckoutResult {
@@ -1217,4 +1231,25 @@ export interface SignupInput {
   country: string
   timeZone?: string
   acceptTerms: boolean
+  attribution?: SignupAttributionInput
+}
+
+/** Campaign data captured by the website (see lib/attribution.ts). */
+export interface SignupAttributionInput {
+  utmSource?: string
+  utmMedium?: string
+  utmCampaign?: string
+  utmTerm?: string
+  utmContent?: string
+  gclid?: string
+  gbraid?: string
+  wbraid?: string
+  fbclid?: string
+  fbp?: string
+  fbc?: string
+  landingPath?: string
+  referrer?: string
+  adConsent: boolean
+  /** Id of the trial conversion, shared by the website's and the server's copy of the event. */
+  eventId: string
 }

@@ -80,6 +80,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             ["Billing__Paddle__PriceIds__Basic"] = "pri_basic",
             ["Billing__Paddle__PriceIds__Standard"] = "pri_standard",
             ["Billing__Paddle__PriceIds__Pro"] = "pri_pro",
+            // Ad measurement: conversions are queued for the Meta Conversions API (the dispatcher does not run here).
+            ["Tracking__Ga4Id"] = "G-TEST123",
+            ["Tracking__GoogleAdsId"] = "AW-111222333",
+            ["Tracking__GoogleAdsSignupLabel"] = "not a valid <label>",
+            ["Tracking__MetaPixelId"] = "1234567890",
+            ["Tracking__MetaCapiToken"] = "meta-test-token",
         };
         foreach (var (key, value) in settings) Environment.SetEnvironmentVariable(key, value);
     }

@@ -143,6 +143,33 @@ Los talleres que ya existían antes de esta versión tienen el plan Profesional 
 docker compose exec api dotnet RepairShop.Api.dll admin plan <email> Pro
 ```
 
+## Anuncios (Google Ads y Meta Ads)
+
+La página de inicio (`/`, y `/en` en inglés) es la landing para los anuncios. Las etiquetas de Google y Meta se cargan solo en las páginas públicas (inicio, precios, legales, registro) y nunca dentro de la app. Cada variable vacía apaga su parte.
+
+| Variable | Dónde se saca |
+| --- | --- |
+| `GA4_ID` | Google Analytics → Administrar → Flujos de datos → web → *ID de medición* (`G-...`) |
+| `GOOGLE_ADS_ID` | Google Ads → Objetivos → Conversiones → una acción → *Configuración de etiqueta* → *ID de conversión* (`AW-...`) |
+| `GOOGLE_ADS_SIGNUP_LABEL` | La *etiqueta de conversión* de la acción "Prueba gratis" (registro) |
+| `GOOGLE_ADS_PURCHASE_LABEL` | La *etiqueta de conversión* de la acción "Suscripción" (compra) |
+| `META_PIXEL_ID` | Meta Events Manager → tu conjunto de datos → *ID del conjunto de datos* |
+| `META_CAPI_TOKEN` | Events Manager → Configuración → API de conversiones → *Generar token de acceso* |
+| `META_TEST_EVENT_CODE` | Opcional: el código de *Probar eventos* (`TEST...`) para ver los eventos del servidor en vivo; vaciarlo después |
+
+Eventos que se envían:
+
+- **Registro** (prueba gratis): `sign_up` en GA4, la conversión `GOOGLE_ADS_SIGNUP_LABEL` y `StartTrial` en Meta, desde el navegador y desde el servidor con el mismo `event_id` (Meta los cuenta una vez).
+- **Primer pago**: `purchase` en GA4, la conversión `GOOGLE_ADS_PURCHASE_LABEL` y `Purchase` en Meta, con el monto del plan.
+
+Consentimiento: en la Unión Europea, el Reino Unido y Suiza (según `CF-IPCountry` de Cloudflare) las etiquetas no se cargan hasta que el visitante acepta el aviso de cookies (Google Consent Mode v2). En el resto se cargan y el aviso permite rechazarlas. Sin consentimiento tampoco se manda nada a Meta desde el servidor.
+
+Cada alta guarda de dónde vino (`utm_*`, `gclid`, `fbclid`, página de entrada). Para verlo:
+
+```bash
+docker compose exec api dotnet RepairShop.Api.dll admin signups 30   # últimos 30 días
+```
+
 ## Notas de seguridad
 
 - Solo el contenedor `web` publica un puerto, y solo en `127.0.0.1`: desde internet se llega únicamente a través del proxy con HTTPS.

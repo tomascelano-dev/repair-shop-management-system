@@ -10,6 +10,7 @@ import { CORE_FEATURES, PLAN_TAGLINE, planFeatures, planPrice, SUBSCRIPTION_STAT
 import { cn } from '../../lib/cn'
 import { date, money } from '../../lib/format'
 import { openPendingPaddleCheckout } from '../../lib/paddle'
+import { configure as configureTracking, trackPurchase } from '../../lib/tracking'
 import { SUBSCRIPTION_KEY } from './shared'
 
 export function BillingPage() {
@@ -32,11 +33,16 @@ export function BillingPage() {
     if (sub.data && (sub.data.status === 'Active' && !sub.data.pendingPlan)) {
       setWaitingPayment(false)
       toast.success('¡Listo! Tu plan está activo.')
+      // The conversion ads optimize for; the server sends the same event id to Meta.
+      if (sub.data.conversionId) {
+        configureTracking(config.data?.tracking, config.data?.visitorCountry)
+        trackPurchase(sub.data.conversionId, sub.data.amount ?? 0, sub.data.currency ?? 'USD', sub.data.plan)
+      }
       return
     }
     const t = window.setTimeout(() => setWaitingPayment(false), 60_000)
     return () => window.clearTimeout(t)
-  }, [waitingPayment, sub.data])
+  }, [waitingPayment, sub.data, config.data])
 
   // Paddle sends the browser back here with ?_ptxn=txn_...: Paddle.js opens the checkout for that transaction.
   const ptxn = params.get('_ptxn')

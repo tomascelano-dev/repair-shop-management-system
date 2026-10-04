@@ -6,6 +6,8 @@ import { renderToString } from 'react-dom/server'
 import { StaticRouter } from 'react-router-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { BillingConfig, PlansResponse } from './api/types'
+import type { Lang } from './features/public/lang'
+import { LandingPage } from './features/public/LandingPage'
 import { PricingPage } from './features/public/PricingPage'
 import { PrivacyPage, RefundPage, TermsPage } from './features/public/LegalPages'
 
@@ -24,6 +26,7 @@ const PLANS: PlansResponse = {
 export interface PublicPage {
   path: string
   file: string
+  lang: Lang
   title: string
   description: string
   /** Text the rendered page must contain (the build fails otherwise). */
@@ -31,40 +34,58 @@ export interface PublicPage {
   element: () => ReactElement
 }
 
+const ES_DESCRIPTION =
+  'Software de gestión para talleres de reparación: órdenes, presupuestos, stock, caja y avisos por WhatsApp. Prueba gratis 14 días, sin tarjeta.'
+const EN_DESCRIPTION =
+  'Repair shop management software: repair orders, quotes, stock, cash register and WhatsApp notifications. 14-day free trial, no credit card.'
+
 export const PUBLIC_PAGES: PublicPage[] = [
+  {
+    // Served at the bare domain to browsers without a session (deploy/Caddyfile).
+    path: '/',
+    file: 'inicio.html',
+    lang: 'es',
+    title: 'RepairShop · Software para servicio técnico',
+    description: ES_DESCRIPTION,
+    expect: 'Prueba gratis 14 días',
+    element: () => <LandingPage initialCountry="US" />,
+  },
   {
     path: '/precios',
     file: 'precios.html',
+    lang: 'es',
     title: 'Precios · RepairShop',
-    description: 'Software de gestión para talleres de reparación: órdenes, presupuestos, stock, caja y avisos. Planes mensuales con prueba gratis.',
+    description: ES_DESCRIPTION,
     expect: 'Profesional',
     element: () => <PricingPage initialCountry="US" />,
   },
+  { path: '/terminos', file: 'terminos.html', lang: 'es', title: 'Términos del servicio · RepairShop', description: 'Términos del servicio de RepairShop.', expect: 'Términos del servicio', element: () => <TermsPage /> },
+  { path: '/privacidad', file: 'privacidad.html', lang: 'es', title: 'Política de privacidad · RepairShop', description: 'Política de privacidad de RepairShop.', expect: 'Política de privacidad', element: () => <PrivacyPage /> },
+  { path: '/reembolsos', file: 'reembolsos.html', lang: 'es', title: 'Política de reembolsos · RepairShop', description: 'Política de reembolsos de RepairShop.', expect: 'Política de reembolsos', element: () => <RefundPage /> },
   {
-    path: '/terminos',
-    file: 'terminos.html',
-    title: 'Términos del servicio · RepairShop',
-    description: 'Términos del servicio de RepairShop.',
-    expect: 'Términos del servicio',
-    element: () => <TermsPage />,
+    path: '/en',
+    file: 'en.html',
+    lang: 'en',
+    title: 'RepairShop · Repair shop management software',
+    description: EN_DESCRIPTION,
+    expect: 'Start your 14-day free trial',
+    element: () => <LandingPage initialCountry="US" />,
   },
   {
-    path: '/privacidad',
-    file: 'privacidad.html',
-    title: 'Política de privacidad · RepairShop',
-    description: 'Política de privacidad de RepairShop.',
-    expect: 'Política de privacidad',
-    element: () => <PrivacyPage />,
+    path: '/en/pricing',
+    file: 'en/pricing.html',
+    lang: 'en',
+    title: 'Pricing · RepairShop',
+    description: EN_DESCRIPTION,
+    expect: 'Professional',
+    element: () => <PricingPage initialCountry="US" />,
   },
-  {
-    path: '/reembolsos',
-    file: 'reembolsos.html',
-    title: 'Política de reembolsos · RepairShop',
-    description: 'Política de reembolsos de RepairShop.',
-    expect: 'Política de reembolsos',
-    element: () => <RefundPage />,
-  },
+  { path: '/en/terms', file: 'en/terms.html', lang: 'en', title: 'Terms of Service · RepairShop', description: 'RepairShop Terms of Service.', expect: 'Terms of Service', element: () => <TermsPage /> },
+  { path: '/en/privacy', file: 'en/privacy.html', lang: 'en', title: 'Privacy Policy · RepairShop', description: 'RepairShop Privacy Policy.', expect: 'Privacy Policy', element: () => <PrivacyPage /> },
+  { path: '/en/refunds', file: 'en/refunds.html', lang: 'en', title: 'Refund Policy · RepairShop', description: 'RepairShop Refund Policy.', expect: 'Refund Policy', element: () => <RefundPage /> },
 ]
+
+export { contactFallback, sellerSentence } from './features/public/legalText'
 
 /**
  * The contact email and seller name come from the server's environment, not from the build: the pages are rendered
@@ -83,6 +104,8 @@ export function render(page: PublicPage): string {
     paddleEnvironment: 'production',
     contactEmail: CONTACT_MARKER,
     legalName: SELLER_MARKER,
+    tracking: { ga4Id: null, googleAdsId: null, googleAdsSignupLabel: null, googleAdsPurchaseLabel: null, metaPixelId: null },
+    visitorCountry: null,
   } satisfies BillingConfig)
   return renderToString(
     <QueryClientProvider client={client}>
