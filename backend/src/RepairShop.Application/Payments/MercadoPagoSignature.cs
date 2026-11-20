@@ -56,6 +56,39 @@ public static class MercadoPagoSignature
         return (ts is not null, v1 is not null, age);
     }
 
+    /// <summary>
+    /// For a rejected notification: which other way of building the manifest the signature matches with this secret
+    /// (a format difference on our side), or null when none does (the secret is not the one Mercado Pago signs with).
+    /// </summary>
+    public static string? MatchingVariant(string secret, string? signatureHeader, string? requestId, string? dataId)
+    {
+        string? ts = null, v1 = null;
+        foreach (var part in (signatureHeader ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var kv = part.Split('=', 2);
+            if (kv.Length != 2) continue;
+            if (kv[0] == "ts") ts = kv[1];
+            else if (kv[0] == "v1") v1 = kv[1];
+        }
+        if (string.IsNullOrWhiteSpace(secret) || ts is null || v1 is null) return null;
+        var id = dataId ?? "";
+        var variants = new (string Name, string Manifest)[]
+        {
+            ("without request-id", $"id:{id.ToLowerInvariant()};ts:{ts};"),
+            ("id as received", $"id:{id};request-id:{requestId};ts:{ts};"),
+            ("without id", $"request-id:{requestId};ts:{ts};"),
+            ("without trailing semicolon", $"id:{id.ToLowerInvariant()};request-id:{requestId};ts:{ts}"),
+            ("secret trimmed", $"id:{id.ToLowerInvariant()};request-id:{requestId};ts:{ts};"),
+        };
+        foreach (var (name, manifest) in variants)
+        {
+            var key = name == "secret trimmed" ? secret.Trim() : secret;
+            var expected = Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(key), Encoding.UTF8.GetBytes(manifest))).ToLowerInvariant();
+            if (CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(expected), Encoding.ASCII.GetBytes(v1.ToLowerInvariant()))) return name;
+        }
+        return null;
+    }
+
     public static string Sign(string secret, string requestId, string dataId, string ts)
     {
         var manifest = $"id:{dataId.ToLowerInvariant()};request-id:{requestId};ts:{ts};";

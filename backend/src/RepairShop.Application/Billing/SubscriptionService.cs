@@ -196,6 +196,11 @@ public sealed class SubscriptionService
             _logger.LogWarning("Rejected Mercado Pago subscription webhook for {Country} with an invalid signature " +
                                "(x-signature: {HasHeader}, ts: {HasTs}, v1: {HasV1}, ts age: {AgeSeconds}s, x-request-id: {HasRequestId}, type: {Type}, data.id: {DataId}).",
                 country, !string.IsNullOrWhiteSpace(n.Signature), hasTs, hasV1, ageSeconds, !string.IsNullOrWhiteSpace(n.RequestId), n.Type, n.DataId);
+            var variant = MercadoPagoSignature.MatchingVariant(account.WebhookSecret, n.Signature, n.RequestId, n.DataId);
+            if (variant is null)
+                _logger.LogWarning("Mercado Pago {Country} webhook: no manifest variant matches either, so the configured webhook secret is not the one Mercado Pago signs with.", country);
+            else
+                _logger.LogError("Mercado Pago {Country} webhook signature matches the variant \"{Variant}\": the manifest format differs from ours.", country, variant);
             return WebhookOutcome.Rejected;
         }
 
