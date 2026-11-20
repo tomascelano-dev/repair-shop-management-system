@@ -10,4 +10,10 @@ export function useDefaultCurrency(): string {
   return useShopSettings().data?.defaultCurrency ?? 'ARS'
 }
 
-export const CURRENCIES = ['ARS', 'USD']
+/**
+ * Currencies offered in the selectors: the shop's own (MXN for a shop in México, ARS in Argentina...) plus pesos
+ * and dollars, which every shop may use.
+ */
+export function currencyOptions(...current: (string | null | undefined)[]): string[] {
+  return [...new Set([...current.filter((c): c is string => !!c), 'ARS', 'USD'])]
+}

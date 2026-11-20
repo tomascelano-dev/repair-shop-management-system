@@ -39,7 +39,7 @@ export function hasSessionHint(): boolean {
 }
 
 // The web server reads the same hint as a cookie: browsers without it get the pre-rendered pricing page at the bare
-// domain (visitors, crawlers and Paddle's reviewer), the others get the app.
+// domain (visitors and crawlers), the others get the app.
 const SESSION_COOKIE = 'rs_app'
 
 export function setSessionHint(active: boolean) {

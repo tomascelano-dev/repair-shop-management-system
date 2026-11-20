@@ -9,7 +9,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation()
   if (state.status === 'loading') return <Loading label="Iniciando sesión…" />
   if (state.status === 'anonymous') {
-    // The bare domain is the public face of the product (Paddle reviews it): visitors see the pricing page, not a login form.
+    // The bare domain is the public face of the product: visitors see the pricing page, not a login form.
     if (location.pathname === '/' && !location.search) return <Navigate to="/precios" replace />
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
   }

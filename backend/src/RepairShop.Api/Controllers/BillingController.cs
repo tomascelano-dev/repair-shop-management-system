@@ -27,14 +27,14 @@ public sealed class BillingController : ControllerBase
         _cache = cache;
     }
 
-    /// <summary>Public price list (pricing page). Argentina sees pesos; every other country, dollars.</summary>
+    /// <summary>Public price list (pricing page) in the country's currency; countries not offered get Argentina's.</summary>
     [HttpGet("plans")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimits.Public)]
     public ActionResult<ApiResponse<PlansResponse>> PlansList([FromQuery] string? country)
         => Ok(Envelope.Ok(_subscriptions.ListPlans(country)));
 
-    /// <summary>Public settings the web app needs before signing in (signup switch, Paddle.js token, legal contact).</summary>
+    /// <summary>Public settings the web app needs before signing in (signup switch, countries sold, legal contact).</summary>
     [HttpGet("config")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimits.Public)]
@@ -45,8 +45,7 @@ public sealed class BillingController : ControllerBase
         return Ok(Envelope.Ok(new BillingConfigResponse(
             o.SignupEnabled,
             o.TrialDays,
-            o.Paddle.IsConfigured ? o.Paddle.ClientToken : null,
-            o.Paddle.IsProduction ? "production" : "sandbox",
+            o.OfferedCountries().Select(c => new BillingCountryResponse(c, SubscriptionService.CurrencyFor(c))).ToList(),
             string.IsNullOrWhiteSpace(o.ContactEmail) ? null : o.ContactEmail.Trim(),
             string.IsNullOrWhiteSpace(o.LegalName) ? null : o.LegalName.Trim(),
             new TrackingConfigResponse(
@@ -96,27 +95,19 @@ public sealed class BillingController : ControllerBase
         return Ok(Envelope.Ok(result));
     }
 
-    /// <summary>Mercado Pago subscription notifications (signed with x-signature; the state is fetched from Mercado Pago).</summary>
+    /// <summary>
+    /// Mercado Pago subscription notifications (signed with x-signature; the state is fetched from Mercado Pago).
+    /// Each country's account points its webhook to /webhooks/mercadopago/{country}; the bare URL is Argentina's.
+    /// </summary>
     [HttpPost("webhooks/mercadopago")]
+    [HttpPost("webhooks/mercadopago/{country:length(2)}")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimits.Webhooks)]
-    public async Task<IActionResult> MercadoPago(CancellationToken ct)
+    public async Task<IActionResult> MercadoPago(string? country, CancellationToken ct)
     {
         var (type, dataId) = await WebhookPayload.ReadMercadoPagoAsync(Request, ct);
         var notification = new MercadoPagoNotification(type, dataId, Request.Headers["x-request-id"].FirstOrDefault(), Request.Headers["x-signature"].FirstOrDefault());
-        return Done(await _subscriptions.HandleMercadoPagoWebhookAsync(notification, ct));
-    }
-
-    /// <summary>Paddle Billing notifications (signed with Paddle-Signature over the raw body).</summary>
-    [HttpPost("webhooks/paddle")]
-    [AllowAnonymous]
-    [EnableRateLimiting(RateLimits.Webhooks)]
-    [RequestSizeLimit(256 * 1024)]
-    public async Task<IActionResult> Paddle(CancellationToken ct)
-    {
-        using var reader = new StreamReader(Request.Body);
-        var body = await reader.ReadToEndAsync(ct);
-        return Done(await _subscriptions.HandlePaddleWebhookAsync(body, Request.Headers["Paddle-Signature"].FirstOrDefault(), ct));
+        return Done(await _subscriptions.HandleMercadoPagoWebhookAsync(country ?? "AR", notification, ct));
     }
 
     /// <summary>
@@ -139,12 +130,14 @@ public sealed class BillingController : ControllerBase
 public sealed record BillingConfigResponse(
     bool SignupEnabled,
     int TrialDays,
-    string? PaddleClientToken,
-    string PaddleEnvironment,
+    IReadOnlyList<BillingCountryResponse> Countries,
     string? ContactEmail,
     string? LegalName,
     TrackingConfigResponse Tracking,
     string? VisitorCountry);
+
+/// <summary>A country where shops can sign up and pay, and the currency Mercado Pago charges there.</summary>
+public sealed record BillingCountryResponse(string Code, string Currency);
 
 /// <summary>Ad measurement tags the website loads (each null when not configured).</summary>
 public sealed record TrackingConfigResponse(string? Ga4Id, string? GoogleAdsId, string? GoogleAdsSignupLabel, string? GoogleAdsPurchaseLabel, string? MetaPixelId);

@@ -1,45 +1,48 @@
-import type { Plan, PlanId, SubscriptionStatus } from '../api/types'
+import type { BillingConfig, Plan, PlanId, SubscriptionStatus } from '../api/types'
 import type { Tone } from './labels'
 
-/** Countries offered at signup (name in Spanish). Argentina pays in pesos; everyone else, in dollars. */
-export const COUNTRIES: { code: string; name: string }[] = [
-  { code: 'AR', name: 'Argentina' },
-  { code: 'BO', name: 'Bolivia' },
-  { code: 'BR', name: 'Brasil' },
-  { code: 'CL', name: 'Chile' },
-  { code: 'CO', name: 'Colombia' },
-  { code: 'CR', name: 'Costa Rica' },
-  { code: 'CU', name: 'Cuba' },
-  { code: 'EC', name: 'Ecuador' },
-  { code: 'SV', name: 'El Salvador' },
-  { code: 'ES', name: 'España' },
-  { code: 'US', name: 'Estados Unidos' },
-  { code: 'GT', name: 'Guatemala' },
-  { code: 'HN', name: 'Honduras' },
-  { code: 'MX', name: 'México' },
-  { code: 'NI', name: 'Nicaragua' },
-  { code: 'PA', name: 'Panamá' },
-  { code: 'PY', name: 'Paraguay' },
-  { code: 'PE', name: 'Perú' },
-  { code: 'PR', name: 'Puerto Rico' },
-  { code: 'DO', name: 'República Dominicana' },
-  { code: 'UY', name: 'Uruguay' },
-  { code: 'VE', name: 'Venezuela' },
-  { code: 'OT', name: 'Otro país' },
-]
+/**
+ * RepairShop is sold where Mercado Pago charges subscriptions; the API lists the countries actually enabled
+ * (each needs the platform's Mercado Pago account there). Argentina is the default.
+ */
+export const DEFAULT_COUNTRY = 'AR'
 
-/** Best guess from browser language (es-MX → MX). Unknown regions use international USD pricing. */
-export function detectCountry(languages: readonly string[] = typeof navigator === 'undefined' ? [] : navigator.languages ?? [navigator.language]): string {
-  for (const lang of languages) {
-    const region = lang.split('-')[1]?.toUpperCase()
-    if (region && COUNTRIES.some((c) => c.code === region)) return region
-  }
-  return 'US'
+/** Countries open for signup and pricing, Argentina first (the API's list, or Argentina while it loads). */
+export function offeredCountries(config?: Pick<BillingConfig, 'countries'> | null): string[] {
+  const codes = config?.countries?.map((c) => c.code) ?? []
+  return codes.length ? codes : [DEFAULT_COUNTRY]
 }
 
-/** "Otro país" is billed like any country outside Argentina. */
-export function billingCountry(code: string): string {
-  return code === 'OT' ? 'US' : code
+/** Best guess among the offered countries from the browser language (es-MX → MX); otherwise the first one. */
+export function detectCountry(
+  offered: readonly string[] = [DEFAULT_COUNTRY],
+  languages: readonly string[] = typeof navigator === 'undefined' ? [] : navigator.languages ?? [navigator.language],
+): string {
+  for (const lang of languages) {
+    const region = lang.split('-')[1]?.toUpperCase()
+    if (region && offered.includes(region)) return region
+  }
+  return offered[0] ?? DEFAULT_COUNTRY
+}
+
+const CURRENCY_NAMES: Record<string, [string, string]> = {
+  ARS: ['pesos argentinos', 'Argentine pesos'],
+  BRL: ['reales', 'Brazilian reais'],
+  CLP: ['pesos chilenos', 'Chilean pesos'],
+  COP: ['pesos colombianos', 'Colombian pesos'],
+  MXN: ['pesos mexicanos', 'Mexican pesos'],
+  PEN: ['soles', 'Peruvian soles'],
+  UYU: ['pesos uruguayos', 'Uruguayan pesos'],
+  USD: ['dólares', 'US dollars'],
+}
+
+/** "pesos argentinos" / "Argentine pesos" for the price notes. */
+export function currencyName(code: string, locale: 'es' | 'en' = 'es'): string {
+  return CURRENCY_NAMES[code]?.[locale === 'en' ? 1 : 0] ?? code
+}
+
+const CURRENCY_LOCALE: Record<string, string> = {
+  ARS: 'es-AR', BRL: 'pt-BR', CLP: 'es-CL', COP: 'es-CO', MXN: 'es-MX', PEN: 'es-PE', UYU: 'es-UY',
 }
 
 export function browserTimeZone(): string | undefined {
@@ -88,7 +91,7 @@ export const SUBSCRIPTION_STATUS: Record<SubscriptionStatus, { label: string; to
 
 export function planPrice(plan: Plan): string {
   if (plan.price == null) return 'Consultar'
-  return new Intl.NumberFormat(plan.currency === 'ARS' ? 'es-AR' : 'en-US', {
+  return new Intl.NumberFormat(CURRENCY_LOCALE[plan.currency] ?? 'en-US', {
     style: 'currency',
     currency: plan.currency,
     maximumFractionDigits: 0,

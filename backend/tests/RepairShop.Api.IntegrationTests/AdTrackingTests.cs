@@ -36,12 +36,12 @@ public sealed class AdTrackingTests
     {
         var eventId = "trial_" + Guid.NewGuid().ToString("N");
         var email = "ads" + Guid.NewGuid().ToString("N") + "@example.com";
-        var (owner, login) = await ApiClient.SignupAsync(_factory, "US", email, new
+        var (owner, login) = await ApiClient.SignupAsync(_factory, "MX", email, new
         {
             utmSource = "google", utmCampaign = "launch", gclid = "test-click", adConsent = true, eventId,
         });
         var org = Guid.Parse(login.GetProperty("user").Str("organizationId"));
-        var (_, otherLogin) = await ApiClient.SignupAsync(_factory, "US", attribution: new { adConsent = false, eventId = "trial_denied" });
+        var (_, otherLogin) = await ApiClient.SignupAsync(_factory, "AR", attribution: new { adConsent = false, eventId = "trial_denied" });
         var otherOrg = Guid.Parse(otherLogin.GetProperty("user").Str("organizationId"));
 
         using var scope = _factory.Services.CreateScope();
@@ -66,20 +66,13 @@ public sealed class AdTrackingTests
         fake.Bodies.Should().ContainSingle();
         fake.Bodies[0].Should().Contain(eventId);
 
-        var subscriptionId = "sub_" + Guid.NewGuid().ToString("N");
         var now = DateTime.UtcNow;
+        var checkoutUrl = (await (await owner.Post("/billing/checkout", new { plan = "Basic" })).DataAsync()).Str("url");
+        var subscriptionId = checkoutUrl.Split('=')[1];
+        _factory.MercadoPago.Authorize(subscriptionId, now.AddMonths(1));
         var http = _factory.CreateClient();
-        var replies = await Task.WhenAll(Enumerable.Range(0, 4).Select(i => Paddle(http, JsonSerializer.Serialize(new
-        {
-            event_id = $"evt_{i}", event_type = "subscription.updated", occurred_at = now.AddMilliseconds(i).ToString("O"),
-            data = new
-            {
-                id = subscriptionId, status = "active", currency_code = "USD",
-                custom_data = new { organization_id = org, plan = "Basic" },
-                current_billing_period = new { ends_at = now.AddMonths(1).ToString("O") },
-                items = new[] { new { price = new { id = "pri_basic", unit_price = new { amount = "2500", currency_code = "USD" } } } },
-            },
-        }))));
+        var replies = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => http.SendAsync(FakeMercadoPago.Notification(
+            "/api/v1/billing/webhooks/mercadopago/mx", "subscription_preapproval", subscriptionId, ApiFactory.MexicoWebhookSecret))));
         replies.Select(r => r.StatusCode).Should().AllBeEquivalentTo(HttpStatusCode.OK);
         var purchases = await db.AdConversions.Where(x => x.OrganizationId == org && x.EventName == "Purchase").ToListAsync();
         purchases.Should().ContainSingle();
@@ -100,14 +93,6 @@ public sealed class AdTrackingTests
         (await db.AdConversions.AsNoTracking().SingleAsync(x => x.OrganizationId == org && x.EventName == "Purchase")).Status.Should().Be(AdConversionStatus.Failed);
         (await db.SignupAttributions.AsNoTracking().SingleAsync(x => x.OrganizationId == org)).AdConsent.Should().BeFalse();
         (await db.SignupAttributions.AsNoTracking().SingleAsync(x => x.OrganizationId == otherOrg)).AdConsent.Should().BeFalse();
-    }
-
-    private static Task<HttpResponseMessage> Paddle(HttpClient http, string body)
-    {
-        var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/billing/webhooks/paddle") { Content = new StringContent(body, Encoding.UTF8, "application/json") };
-        request.Headers.Add("Paddle-Signature", $"ts={ts};h1={PaddleSignature.Sign(ApiFactory.PaddleWebhookSecret, ts, body)}");
-        return http.SendAsync(request);
     }
 
     private sealed class MetaHttp : HttpMessageHandler, IHttpClientFactory

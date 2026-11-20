@@ -299,6 +299,27 @@ if (app.Environment.IsProduction() && !isSeedCommand)
     if (RepairShop.Infrastructure.Security.MasterKey.From(config) is null)
         app.Logger.LogWarning("DataProtection:MasterKey is not set: the key ring that protects shop secrets (Mercado Pago tokens, ARCA certificates) " +
                               "is stored unencrypted in the database. Set DataProtection__MasterKey (e.g. `openssl rand -base64 32`).");
+
+    var billing = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<RepairShop.Application.Billing.BillingOptions>>().Value;
+    if (billing.AllowSimulated)
+        throw new InvalidOperationException("Billing:AllowSimulated cannot be true in Production (anyone could activate a paid plan for free).");
+    foreach (var (country, account) in billing.Countries)
+    {
+        var hasToken = !string.IsNullOrWhiteSpace(account.AccessToken);
+        var hasSecret = !string.IsNullOrWhiteSpace(account.WebhookSecret);
+        if (!hasToken && !hasSecret) continue; // country not enabled: nothing to check
+        if (!RepairShop.Application.Billing.MercadoPagoCountries.IsSupported(country))
+            app.Logger.LogWarning("Billing:Countries:{Country} is ignored: Mercado Pago does not sell subscriptions there.", country);
+        else if (!hasToken || !hasSecret)
+            app.Logger.LogWarning("Billing:Countries:{Country} needs both the Mercado Pago access token and the webhook secret: shops from {Country} cannot sign up or pay.", country, country);
+        else if (!account.HasAllPrices)
+            app.Logger.LogWarning("Billing:Countries:{Country} is missing the price of a plan: shops from {Country} cannot sign up or pay.", country, country);
+    }
+    var offered = billing.OfferedCountries();
+    if (billing.SignupEnabled && offered.Count == 0)
+        app.Logger.LogWarning("Billing:SignupEnabled is true but no country has a complete Mercado Pago account: every signup will be rejected.");
+    else
+        app.Logger.LogInformation("Billing: signup and Mercado Pago checkout open for {Countries}.", string.Join(", ", offered));
 }
 
 if (app.Environment.IsDevelopment() || config.GetValue<bool>("Swagger:Enabled"))

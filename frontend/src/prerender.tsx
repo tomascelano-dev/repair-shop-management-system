@@ -11,15 +11,15 @@ import { publicPath, type PublicLocale } from './lib/publicLocale'
 import { PricingPage } from './features/public/PricingPage'
 import { PrivacyPage, RefundPage, TermsPage } from './features/public/LegalPages'
 
-/** Default dollar prices (backend Billing:UsdPrices). The live page fetches the configured prices on load. */
+/** Default Argentine prices (backend Billing:Countries:AR:Prices). The live page fetches the configured prices on load. */
 const PLANS: PlansResponse = {
-  country: 'US',
-  currency: 'USD',
+  country: 'AR',
+  currency: 'ARS',
   trialDays: 14,
   plans: [
-    { id: 'Basic', name: 'Básico', maxBranches: 1, modules: [], price: 25, currency: 'USD' },
-    { id: 'Standard', name: 'Estándar', maxBranches: 2, modules: ['purchasing', 'reports'], price: 45, currency: 'USD' },
-    { id: 'Pro', name: 'Profesional', maxBranches: 10, modules: ['purchasing', 'reports', 'transfers', 'audit', 'ai'], price: 79, currency: 'USD' },
+    { id: 'Basic', name: 'Básico', maxBranches: 1, modules: [], price: 29900, currency: 'ARS' },
+    { id: 'Standard', name: 'Estándar', maxBranches: 2, modules: ['purchasing', 'reports'], price: 44900, currency: 'ARS' },
+    { id: 'Pro', name: 'Profesional', maxBranches: 10, modules: ['purchasing', 'reports', 'transfers', 'audit', 'ai'], price: 74900, currency: 'ARS' },
   ],
 }
 
@@ -38,7 +38,7 @@ export const PUBLIC_PAGES: PublicPage[] = (['es', 'en'] as const).flatMap((local
   const en = locale === 'en'
   const pages = [
     { section: 'home' as const, title: en ? 'Repair shop management' : 'Gestión de talleres', expect: en ? 'More repairs.' : 'Más reparaciones.', element: () => <LandingPage /> },
-    { section: 'pricing' as const, title: en ? 'Pricing' : 'Precios', expect: en ? 'Professional' : 'Profesional', element: () => <PricingPage initialCountry="US" /> },
+    { section: 'pricing' as const, title: en ? 'Pricing' : 'Precios', expect: en ? 'Professional' : 'Profesional', element: () => <PricingPage initialCountry="AR" /> },
     { section: 'terms' as const, title: en ? 'Terms of service' : 'Términos del servicio', expect: en ? 'Terms of service' : 'Términos del servicio', element: () => <TermsPage /> },
     { section: 'privacy' as const, title: en ? 'Privacy policy' : 'Política de privacidad', expect: en ? 'Privacy policy' : 'Política de privacidad', element: () => <PrivacyPage /> },
     { section: 'refunds' as const, title: en ? 'Refund policy' : 'Política de reembolsos', expect: en ? 'Refund policy' : 'Política de reembolsos', element: () => <RefundPage /> },
@@ -61,12 +61,11 @@ export const SELLER_MARKER = '__RS_LEGAL_NAME__'
 // eslint-disable-next-line react-refresh/only-export-components
 export function render(page: PublicPage): string {
   const client = new QueryClient()
-  client.setQueryData(['plans', 'US'], PLANS)
+  client.setQueryData(['plans', 'AR'], PLANS)
   client.setQueryData(['billing-config'], {
     signupEnabled: true,
     trialDays: PLANS.trialDays,
-    paddleClientToken: null,
-    paddleEnvironment: 'production',
+    countries: [{ code: 'AR', currency: 'ARS' }],
     contactEmail: CONTACT_MARKER,
     legalName: SELLER_MARKER,
   } satisfies BillingConfig)

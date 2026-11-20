@@ -7,15 +7,15 @@ import { billingApi } from '../../api/endpoints'
 import { errorMessage } from '../../api/http'
 import type { Plan, PlanId, Subscription } from '../../api/types'
 import { Alert, Badge, Button, Card, ConfirmDialog, ErrorState, KeyValue, Loading, PageHeader } from '../../components/ui'
-import { CORE_FEATURES, PLAN_TAGLINE, planFeatures, planPrice, SUBSCRIPTION_STATUS } from '../../lib/billing'
+import { CORE_FEATURES, currencyName, PLAN_TAGLINE, planFeatures, planPrice, SUBSCRIPTION_STATUS } from '../../lib/billing'
 import { cn } from '../../lib/cn'
 import { date, money } from '../../lib/format'
-import { openPendingPaddleCheckout } from '../../lib/paddle'
 import { SUBSCRIPTION_KEY } from './shared'
 
 export function BillingPage() {
   const qc = useQueryClient()
-  const [params, setParams] = useSearchParams()
+  // Mercado Pago sends the customer back here with ?preapproval_id=... after the checkout.
+  const [params] = useSearchParams()
   const [waitingPayment, setWaitingPayment] = useState(() => params.has('preapproval_id'))
   const [confirmCancel, setConfirmCancel] = useState(false)
 
@@ -42,24 +42,6 @@ export function BillingPage() {
     const t = window.setTimeout(() => setWaitingPayment(false), 60_000)
     return () => window.clearTimeout(t)
   }, [waitingPayment, sub.data, config.data])
-
-  // Paddle sends the browser back here with ?_ptxn=txn_...: Paddle.js opens the checkout for that transaction.
-  const ptxn = params.get('_ptxn')
-  useEffect(() => {
-    if (!ptxn || !config.data) return
-    const token = config.data.paddleClientToken
-    if (!token) {
-      toast.error('El pago con tarjeta no está disponible en este momento.')
-      return
-    }
-    openPendingPaddleCheckout(token, config.data.paddleEnvironment, {
-      completed: () => {
-        setWaitingPayment(true)
-        setParams({}, { replace: true })
-      },
-      closed: () => setParams({}, { replace: true }),
-    }).catch((err: unknown) => toast.error(errorMessage(err)))
-  }, [ptxn, config.data, setParams])
 
   const checkout = useMutation({
     mutationFn: (plan: PlanId) => billingApi.checkout(plan),
@@ -115,7 +97,7 @@ export function BillingPage() {
       ) : (
         <>
           {!s.checkoutAvailable ? (
-            <Alert tone="amber">El cobro online todavía no está habilitado para tu país. Escribinos y activamos tu plan a mano.</Alert>
+            <Alert tone="amber">Todavía no cobramos online en tu país. Escribinos y activamos tu plan a mano.</Alert>
           ) : null}
           <div className="grid gap-4 md:grid-cols-3">
             {s.plans.map((p) => (
@@ -133,7 +115,7 @@ export function BillingPage() {
           </div>
           <p className="text-xs text-slate-500">
             Todos los planes incluyen: {CORE_FEATURES.join(' · ')}.{' '}
-            {s.billingCountry === 'AR' ? 'Se cobra en pesos con Mercado Pago.' : 'Se cobra en dólares con Paddle, que suma los impuestos de tu país.'}
+            {s.checkoutAvailable && s.plans[0] ? `Se cobra en ${currencyName(s.plans[0].currency)} con Mercado Pago, con débito automático cada mes.` : null}
           </p>
         </>
       )}

@@ -1152,6 +1152,7 @@ export interface PublicTracking {
 
 export type PlanId = 'Basic' | 'Standard' | 'Pro'
 export type SubscriptionStatus = 'Trialing' | 'Active' | 'PastDue' | 'Canceled' | 'Expired'
+/** 'Paddle' only appears on legacy rows (Paddle was removed); new subscriptions are always Mercado Pago. */
 export type BillingProvider = 'None' | 'Manual' | 'MercadoPago' | 'Paddle' | 'Simulated'
 
 export interface Plan {
@@ -1173,14 +1174,19 @@ export interface PlansResponse {
 export interface BillingConfig {
   signupEnabled: boolean
   trialDays: number
-  paddleClientToken: string | null
-  paddleEnvironment: 'sandbox' | 'production'
+  /** Countries where shops can sign up and pay (Mercado Pago), Argentina first, with the currency charged there. */
+  countries: BillingCountry[]
   /** Public support email for the legal pages; null until the platform sets CONTACT_EMAIL. */
   contactEmail: string | null
   /** Seller shown in the Terms; null until the platform sets LEGAL_NAME. */
   legalName: string | null
   tracking?: TrackingConfig
   visitorCountry?: string | null
+}
+
+export interface BillingCountry {
+  code: string
+  currency: string
 }
 
 export interface TrackingConfig {

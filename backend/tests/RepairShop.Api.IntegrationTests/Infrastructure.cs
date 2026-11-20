@@ -2,8 +2,12 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using RepairShop.Infrastructure.Billing;
 
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 
@@ -16,6 +20,15 @@ namespace RepairShop.Api.IntegrationTests;
 public sealed class IntegrationFactAttribute : FactAttribute
 {
     public IntegrationFactAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(TestDatabase.ServerConnection))
+            Skip = "Definí REPAIRSHOP_TEST_CONNECTION para correr los tests de integración.";
+    }
+}
+
+public sealed class IntegrationTheoryAttribute : TheoryAttribute
+{
+    public IntegrationTheoryAttribute()
     {
         if (string.IsNullOrWhiteSpace(TestDatabase.ServerConnection))
             Skip = "Definí REPAIRSHOP_TEST_CONNECTION para correr los tests de integración.";
@@ -49,9 +62,21 @@ public static class TestDatabase
 /// <summary>The API running in memory against a fresh database (migrated and seeded with the dev users).</summary>
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
-    public const string PaddleWebhookSecret = "pdl_ntfset_integration_tests";
+    /// <summary>Mexico has a (fake) Mercado Pago account; Argentina has none, so its checkouts are simulated.</summary>
+    public const string MexicoAccessToken = "APP_USR-integration-tests-mx";
+    public const string MexicoWebhookSecret = "mp_webhook_secret_integration_tests";
 
     public string ConnectionString { get; }
+
+    /// <summary>Stands in for api.mercadopago.com (preapprovals of the Mexican account).</summary>
+    public FakeMercadoPago MercadoPago { get; } = new(MexicoAccessToken);
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureTestServices(services =>
+            services.AddHttpClient(MercadoPagoSubscriptionGateway.HttpClientName)
+                .ConfigurePrimaryHttpMessageHandler(() => new FakeMercadoPago.Handler(MercadoPago)));
+    }
 
     public ApiFactory()
     {
@@ -71,15 +96,14 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             ["RateLimiting__PublicPerMinute"] = "100000",
             ["App__PublicApiUrl"] = "http://localhost",
             ["App__FrontendBaseUrl"] = "http://localhost:5173",
-            // Paddle "configured" so its webhooks are accepted (tests never call its API); Mercado Pago is not,
-            // so checkouts from Argentina fall back to the simulated provider.
+            // Argentina (prices from appsettings.json, no credentials) falls back to the simulated provider;
+            // Mexico charges through the fake Mercado Pago account.
             ["Billing__AllowSimulated"] = "true",
-            ["Billing__Paddle__ApiKey"] = "pdl_test_key",
-            ["Billing__Paddle__ClientToken"] = "test_client_token",
-            ["Billing__Paddle__WebhookSecret"] = PaddleWebhookSecret,
-            ["Billing__Paddle__PriceIds__Basic"] = "pri_basic",
-            ["Billing__Paddle__PriceIds__Standard"] = "pri_standard",
-            ["Billing__Paddle__PriceIds__Pro"] = "pri_pro",
+            ["Billing__Countries__MX__AccessToken"] = MexicoAccessToken,
+            ["Billing__Countries__MX__WebhookSecret"] = MexicoWebhookSecret,
+            ["Billing__Countries__MX__Prices__Basic"] = "449",
+            ["Billing__Countries__MX__Prices__Standard"] = "799",
+            ["Billing__Countries__MX__Prices__Pro"] = "1399",
             ["Tracking__MetaPixelId"] = "123456789",
             ["Tracking__MetaCapiToken"] = "integration-private-meta-token",
         };

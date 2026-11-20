@@ -12,7 +12,7 @@ import { dateTime, money, parseAmount } from '../../lib/format'
 import { downloadFile } from '../../lib/files'
 import { useDebounced } from '../../lib/hooks'
 import { ADJUSTMENT_TYPE } from '../../lib/labels'
-import { CURRENCIES, useDefaultCurrency } from '../../lib/shop'
+import { currencyOptions, useDefaultCurrency } from '../../lib/shop'
 import { ImportDialog } from '../customers/CustomersPage'
 
 const TAKE = 25
@@ -343,7 +343,7 @@ function ItemForm({ item, readOnly, onSaved }: { item: InventoryItem | null; rea
           <div className="flex gap-2">
             <Input id={costId} inputMode="decimal" value={v.unitCost} aria-invalid={errors.unitCost ? true : undefined} onChange={(e) => set('unitCost', e.target.value)} />
             <Select className="w-24" value={v.unitCostCurrency} onChange={(e) => set('unitCostCurrency', e.target.value)} aria-label="Moneda del costo">
-              {CURRENCIES.map((c) => (
+              {currencyOptions(currency).map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </Select>
@@ -357,7 +357,7 @@ function ItemForm({ item, readOnly, onSaved }: { item: InventoryItem | null; rea
             <div className="flex gap-2">
               <Input id={priceId} inputMode="decimal" value={v.salePrice} aria-invalid={errors.salePrice ? true : undefined} onChange={(e) => set('salePrice', e.target.value)} />
               <Select className="w-24" value={v.salePriceCurrency} onChange={(e) => set('salePriceCurrency', e.target.value)} aria-label="Moneda del precio">
-                {CURRENCIES.map((c) => (
+                {currencyOptions(currency).map((c) => (
                   <option key={c}>{c}</option>
                 ))}
               </Select>

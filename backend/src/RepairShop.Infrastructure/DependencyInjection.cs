@@ -187,13 +187,7 @@ public static class DependencyInjection
             c.Timeout = TimeSpan.FromSeconds(20);
             c.DefaultRequestHeaders.UserAgent.Add(userAgent);
         });
-        services.AddHttpClient(PaddleSubscriptionGateway.HttpClientName, c =>
-        {
-            c.Timeout = TimeSpan.FromSeconds(20);
-            c.DefaultRequestHeaders.UserAgent.Add(userAgent);
-        });
         services.AddSingleton<ISubscriptionGateway, MercadoPagoSubscriptionGateway>();
-        services.AddSingleton<ISubscriptionGateway, PaddleSubscriptionGateway>();
 
         services.Configure<TrackingOptions>(config.GetSection(TrackingOptions.SectionName));
         services.AddHttpClient(MetaConversionsDispatcher.HttpClientName, c =>

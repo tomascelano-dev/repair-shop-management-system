@@ -10,96 +10,104 @@ public sealed class BillingOptions
     public int TrialDays { get; set; } = 14;
 
     /// <summary>
-    /// Development and tests: activate subscriptions without charging when the provider is not configured.
-    /// Never enable it on a public server (anyone could pick a paid plan for free).
+    /// Development and tests: activate subscriptions without charging when the country's Mercado Pago account is not
+    /// configured. Never enable it on a public server (anyone could pick a paid plan for free); Production refuses to start.
     /// </summary>
     public bool AllowSimulated { get; set; }
 
     /// <summary>Allow new shops to sign up from the website.</summary>
     public bool SignupEnabled { get; set; } = true;
 
-    /// <summary>Public support email shown in the Terms, Privacy and Refund pages (Paddle asks for one).</summary>
+    /// <summary>Public support email shown in the Terms, Privacy and Refund pages.</summary>
     public string ContactEmail { get; set; } = "";
 
-    /// <summary>Name of the person or company that sells the service, shown in the Terms (Paddle asks for it).</summary>
+    /// <summary>Name of the person or company that sells the service, shown in the Terms.</summary>
     public string LegalName { get; set; } = "";
 
-    /// <summary>Monthly price per plan in US dollars (Paddle, every country except Argentina). Must match the Paddle prices.</summary>
-    public Dictionary<string, decimal> UsdPrices { get; set; } = new() { ["Basic"] = 25m, ["Standard"] = 45m, ["Pro"] = 79m };
+    /// <summary>
+    /// Countries where RepairShop is sold, keyed by ISO code (AR, MX...). Each one charges in its own currency through
+    /// the platform's Mercado Pago account in that country (Mercado Pago accounts are per country).
+    /// </summary>
+    public Dictionary<string, MercadoPagoAccountOptions> Countries { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Monthly price per plan in Argentine pesos (Mercado Pago).</summary>
-    public Dictionary<string, decimal> ArsPrices { get; set; } = new() { ["Basic"] = 29900m, ["Standard"] = 44900m, ["Pro"] = 74900m };
-
-    public MercadoPagoBillingOptions MercadoPago { get; set; } = new();
-    public PaddleBillingOptions Paddle { get; set; } = new();
-
-    public decimal? PriceFor(PlanId plan, string currency)
+    public MercadoPagoAccountOptions? Account(string? country)
     {
-        var table = string.Equals(currency, "ARS", StringComparison.OrdinalIgnoreCase) ? ArsPrices : UsdPrices;
-        return table.TryGetValue(plan.ToString(), out var price) && price > 0 ? price : null;
+        if (string.IsNullOrWhiteSpace(country)) return null;
+        var key = country.Trim();
+        if (Countries.TryGetValue(key, out var account)) return account;
+        // The configuration binder may rebuild the dictionary with the default (case-sensitive) comparer.
+        foreach (var (k, v) in Countries)
+            if (string.Equals(k.Trim(), key, StringComparison.OrdinalIgnoreCase)) return v;
+        return null;
     }
-}
-
-public sealed class MercadoPagoBillingOptions
-{
-    /// <summary>Access token of the platform's own Mercado Pago account (not a shop's).</summary>
-    public string AccessToken { get; set; } = "";
-
-    /// <summary>Secret of the webhook configured in Mercado Pago (Tus integraciones → Webhooks).</summary>
-    public string WebhookSecret { get; set; } = "";
-
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(AccessToken) && !string.IsNullOrWhiteSpace(WebhookSecret);
-}
-
-public sealed class PaddleBillingOptions
-{
-    /// <summary>"sandbox" (default) or "production".</summary>
-    public string Environment { get; set; } = "sandbox";
-
-    /// <summary>Server-side API key (Paddle → Developer tools → Authentication).</summary>
-    public string ApiKey { get; set; } = "";
-
-    /// <summary>Client-side token for Paddle.js (Paddle → Developer tools → Authentication → client-side tokens).</summary>
-    public string ClientToken { get; set; } = "";
-
-    /// <summary>Secret key of the notification destination (Paddle → Developer tools → Notifications).</summary>
-    public string WebhookSecret { get; set; } = "";
-
-    /// <summary>Paddle price id per plan (pri_...), each a monthly recurring price in USD.</summary>
-    public Dictionary<string, string> PriceIds { get; set; } = new();
-
-    public bool IsProduction => string.Equals(Environment, "production", StringComparison.OrdinalIgnoreCase);
-
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(ApiKey)
-                                && !string.IsNullOrWhiteSpace(ClientToken)
-                                && !string.IsNullOrWhiteSpace(WebhookSecret)
-                                && Plans.All.All(p => PriceIds.TryGetValue(p.Id.ToString(), out var id) && !string.IsNullOrWhiteSpace(id));
 
     /// <summary>
-    /// Describes keys that belong to the other Paddle environment (live keys with Environment=sandbox or the
-    /// other way round), which Paddle rejects with 403; null when they match or carry no recognizable prefix.
+    /// Shops from this country can sign up and pay: Mercado Pago sells subscriptions there, the plans have prices and
+    /// the account has credentials (or, outside Production, charges are simulated).
     /// </summary>
-    public string? EnvironmentMismatch()
+    public bool IsOffered(string? country)
     {
-        var expectedKey = IsProduction ? "pdl_live_" : "pdl_sdbx_";
-        var otherKey = IsProduction ? "pdl_sdbx_" : "pdl_live_";
-        var expectedToken = IsProduction ? "live_" : "test_";
-        var otherToken = IsProduction ? "test_" : "live_";
-        var env = IsProduction ? "production" : "sandbox";
-        if (ApiKey.Trim().StartsWith(otherKey, StringComparison.Ordinal))
-            return $"PADDLE_API_KEY starts with {otherKey} but PADDLE_ENVIRONMENT is {env} (expected {expectedKey}...)";
-        if (ClientToken.Trim().StartsWith(otherToken, StringComparison.Ordinal))
-            return $"PADDLE_CLIENT_TOKEN starts with {otherToken} but PADDLE_ENVIRONMENT is {env} (expected {expectedToken}...)";
-        return null;
+        var account = Account(country);
+        return MercadoPagoCountries.IsSupported(country) && account is not null && account.HasAllPrices && (account.IsConfigured || AllowSimulated);
     }
 
-    public string? PriceIdFor(PlanId plan) => PriceIds.TryGetValue(plan.ToString(), out var id) && !string.IsNullOrWhiteSpace(id) ? id.Trim() : null;
+    /// <summary>Offered countries, Argentina first.</summary>
+    public IReadOnlyList<string> OfferedCountries()
+        => Countries.Keys
+            .Select(c => c.Trim().ToUpperInvariant())
+            .Where(IsOffered)
+            .Distinct()
+            .OrderBy(c => c == "AR" ? 0 : 1)
+            .ThenBy(c => c, StringComparer.Ordinal)
+            .ToList();
 
-    public PlanId? PlanForPriceId(string? priceId)
+    /// <summary>Monthly price of the plan in the country's currency (null when not configured).</summary>
+    public decimal? PriceFor(PlanId plan, string? country)
+        => Account(country)?.PriceFor(plan);
+}
+
+/// <summary>The platform's own Mercado Pago account in one country (not a shop's).</summary>
+public sealed class MercadoPagoAccountOptions
+{
+    /// <summary>Production access token of the account (APP_USR-...).</summary>
+    public string AccessToken { get; set; } = "";
+
+    /// <summary>Secret of the webhook configured in that account (Tus integraciones → Webhooks).</summary>
+    public string WebhookSecret { get; set; } = "";
+
+    /// <summary>Monthly price per plan (Basic, Standard, Pro) in the country's currency. Final prices, taxes included.</summary>
+    public Dictionary<string, decimal> Prices { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(AccessToken) && !string.IsNullOrWhiteSpace(WebhookSecret);
+
+    public bool HasAllPrices => Plans.All.All(p => PriceFor(p.Id) is not null);
+
+    public decimal? PriceFor(PlanId plan)
     {
-        if (string.IsNullOrWhiteSpace(priceId)) return null;
-        foreach (var (key, value) in PriceIds)
-            if (string.Equals(value?.Trim(), priceId, StringComparison.Ordinal) && Plans.TryParse(key, out var plan)) return plan;
+        foreach (var (k, price) in Prices)
+            if (string.Equals(k.Trim(), plan.ToString(), StringComparison.OrdinalIgnoreCase)) return price > 0 ? price : null;
         return null;
     }
+}
+
+/// <summary>Countries where Mercado Pago sells recurring subscriptions (preapproval), with the currency it charges in.</summary>
+public static class MercadoPagoCountries
+{
+    private static readonly Dictionary<string, string> Currencies = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["AR"] = "ARS",
+        ["BR"] = "BRL",
+        ["CL"] = "CLP",
+        ["CO"] = "COP",
+        ["MX"] = "MXN",
+        ["PE"] = "PEN",
+        ["UY"] = "UYU",
+    };
+
+    public static IReadOnlyCollection<string> All => Currencies.Keys;
+
+    public static bool IsSupported(string? country) => country is not null && Currencies.ContainsKey(country.Trim());
+
+    /// <summary>Currency Mercado Pago charges in for the country; null outside Mercado Pago countries.</summary>
+    public static string? CurrencyFor(string? country) => country is not null && Currencies.TryGetValue(country.Trim(), out var c) ? c : null;
 }

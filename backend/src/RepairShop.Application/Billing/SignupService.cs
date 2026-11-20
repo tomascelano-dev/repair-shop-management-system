@@ -70,6 +70,8 @@ public sealed class SignupService
         if (ownerName.Length is < 2 or > 120) throw new DomainException("Ingresá tu nombre (entre 2 y 120 caracteres).");
         PasswordPolicy.Validate(req.Password);
         var country = Subscription.NormalizeCountry(req.Country);
+        if (!_options.IsOffered(country))
+            throw new DomainException(OfferedCountriesMessage(_options.OfferedCountries()));
 
         if (await _users.GetByEmailAsync(email, ct) is not null)
             throw new ConflictException("Ya existe una cuenta con ese email. Iniciá sesión o recuperá tu contraseña.");
@@ -100,6 +102,19 @@ public sealed class SignupService
         }, ct);
 
         return await _auth.SignInAsync(user, ip, userAgent, ct);
+    }
+
+    private static readonly Dictionary<string, string> CountryNames = new()
+    {
+        ["AR"] = "Argentina", ["BR"] = "Brasil", ["CL"] = "Chile", ["CO"] = "Colombia", ["MX"] = "México", ["PE"] = "Perú", ["UY"] = "Uruguay",
+    };
+
+    internal static string OfferedCountriesMessage(IReadOnlyList<string> offered)
+    {
+        if (offered.Count == 0) return "Por ahora no estamos tomando altas nuevas. Escribinos y te avisamos.";
+        var names = offered.Select(c => CountryNames.GetValueOrDefault(c, c)).ToList();
+        var list = names.Count == 1 ? names[0] : string.Join(", ", names.Take(names.Count - 1)) + " y " + names[^1];
+        return $"Por ahora RepairShop está disponible para talleres de {list}.";
     }
 
     private static SignupAttributionData ToData(SignupAttributionRequest? a) => a is null

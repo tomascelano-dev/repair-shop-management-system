@@ -13,12 +13,13 @@ using RepairShop.Domain.Common;
 namespace RepairShop.Infrastructure.Billing;
 
 /// <summary>
-/// Monthly subscriptions in Argentine pesos with Mercado Pago "suscripciones sin plan asociado" (preapproval),
-/// charged to the platform's own Mercado Pago account.
+/// Monthly subscriptions with Mercado Pago "suscripciones sin plan asociado" (preapproval), charged in each
+/// country's currency to the platform's own Mercado Pago account in that country.
 /// </summary>
-public sealed class MercadoPagoSubscriptionGateway : IMercadoPagoSubscriptionGateway
+public sealed class MercadoPagoSubscriptionGateway : ISubscriptionGateway
 {
     public const string HttpClientName = "mercadopago-billing";
+    private const string MisconfiguredMessage = "El cobro con Mercado Pago no está bien configurado todavía. Escribinos y lo resolvemos.";
 
     private readonly IHttpClientFactory _http;
     private readonly BillingOptions _options;
@@ -31,8 +32,7 @@ public sealed class MercadoPagoSubscriptionGateway : IMercadoPagoSubscriptionGat
         _logger = logger;
     }
 
-    public BillingProvider Provider => BillingProvider.MercadoPago;
-    public bool IsConfigured => _options.MercadoPago.IsConfigured;
+    public bool IsConfigured(string country) => MercadoPagoCountries.IsSupported(country) && _options.Account(country)?.IsConfigured == true;
 
     public static string ExternalReference(Guid organizationId, PlanId plan) => $"org:{organizationId:N}:plan:{plan}";
 
@@ -45,9 +45,9 @@ public sealed class MercadoPagoSubscriptionGateway : IMercadoPagoSubscriptionGat
         return (org, plan);
     }
 
-    public async Task<GatewayCheckout> CreateCheckoutAsync(GatewayCheckoutRequest r, CancellationToken ct)
+    public async Task<GatewayCheckout> CreateCheckoutAsync(string country, GatewayCheckoutRequest r, CancellationToken ct)
     {
-        using var req = Request(HttpMethod.Post, "preapproval", new
+        using var req = Request(country, HttpMethod.Post, "preapproval", new
         {
             reason = r.Description,
             external_reference = ExternalReference(r.OrganizationId, r.Plan),
@@ -62,17 +62,17 @@ public sealed class MercadoPagoSubscriptionGateway : IMercadoPagoSubscriptionGat
         return new GatewayCheckout(root.GetProperty("init_point").GetString()!, root.GetProperty("id").GetString());
     }
 
-    public async Task<GatewaySubscriptionState?> GetSubscriptionAsync(string id, CancellationToken ct)
+    public async Task<GatewaySubscriptionState?> GetSubscriptionAsync(string country, string id, CancellationToken ct)
     {
         if (!IsSafeId(id)) return null;
-        using var doc = await SendAsync(Request(HttpMethod.Get, $"preapproval/{id}"), "consultar la suscripción", ct, allowNotFound: true);
+        using var doc = await SendAsync(Request(country, HttpMethod.Get, $"preapproval/{id}"), "consultar la suscripción", ct, allowNotFound: true);
         return doc is null ? null : ToState(doc.RootElement);
     }
 
-    public async Task ChangePlanAsync(string id, PlanId plan, decimal amount, string currency, CancellationToken ct)
+    public async Task ChangePlanAsync(string country, string id, PlanId plan, decimal amount, string currency, CancellationToken ct)
     {
-        var current = await GetSubscriptionAsync(id, ct) ?? throw new DomainException("No encontramos la suscripción en Mercado Pago.");
-        using var _ = await SendAsync(Request(HttpMethod.Put, $"preapproval/{id}", new
+        var current = await GetSubscriptionAsync(country, id, ct) ?? throw new DomainException("No encontramos la suscripción en Mercado Pago.");
+        using var _ = await SendAsync(Request(country, HttpMethod.Put, $"preapproval/{id}", new
         {
             reason = $"RepairShop {Plans.Get(plan).Name} (mensual)",
             external_reference = ExternalReference(current.OrganizationId ?? Guid.Empty, plan),
@@ -80,16 +80,16 @@ public sealed class MercadoPagoSubscriptionGateway : IMercadoPagoSubscriptionGat
         }), "cambiar el plan", ct);
     }
 
-    public async Task CancelAsync(string id, CancellationToken ct)
+    public async Task CancelAsync(string country, string id, CancellationToken ct)
     {
         if (!IsSafeId(id)) return;
-        using var _ = await SendAsync(Request(HttpMethod.Put, $"preapproval/{id}", new { status = "cancelled" }), "cancelar la suscripción", ct);
+        using var _ = await SendAsync(Request(country, HttpMethod.Put, $"preapproval/{id}", new { status = "cancelled" }), "cancelar la suscripción", ct);
     }
 
-    public async Task<string?> GetPreapprovalIdForPaymentAsync(string authorizedPaymentId, CancellationToken ct)
+    public async Task<string?> GetPreapprovalIdForPaymentAsync(string country, string authorizedPaymentId, CancellationToken ct)
     {
         if (!IsSafeId(authorizedPaymentId)) return null;
-        using var doc = await SendAsync(Request(HttpMethod.Get, $"authorized_payments/{authorizedPaymentId}"), "consultar el cobro", ct, allowNotFound: true);
+        using var doc = await SendAsync(Request(country, HttpMethod.Get, $"authorized_payments/{authorizedPaymentId}"), "consultar el cobro", ct, allowNotFound: true);
         return doc is not null && doc.RootElement.TryGetProperty("preapproval_id", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
     }
 
@@ -122,10 +122,16 @@ public sealed class MercadoPagoSubscriptionGateway : IMercadoPagoSubscriptionGat
             Date(p, "last_modified"));
     }
 
-    private HttpRequestMessage Request(HttpMethod method, string path, object? body = null)
+    private HttpRequestMessage Request(string country, HttpMethod method, string path, object? body = null)
     {
+        var account = IsConfigured(country) ? _options.Account(country)! : null;
+        if (account is null)
+        {
+            _logger.LogError("Mercado Pago billing account for {Country} is not configured.", country);
+            throw new DomainException(MisconfiguredMessage);
+        }
         var req = new HttpRequestMessage(method, path);
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.MercadoPago.AccessToken);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", account.AccessToken.Trim());
         if (body is not null) req.Content = JsonContent.Create(body);
         return req;
     }
@@ -143,7 +149,7 @@ public sealed class MercadoPagoSubscriptionGateway : IMercadoPagoSubscriptionGat
                 _logger.LogWarning("MercadoPago: {Action} failed with {Status}: {Code} {Detail}", what, (int)res.StatusCode, code, detail);
                 // 401/403 mean the platform's credentials are wrong, which retrying will not fix.
                 if (res.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-                    throw new DomainException("El cobro con Mercado Pago no está bien configurado todavía. Escribinos y lo resolvemos.");
+                    throw new DomainException(MisconfiguredMessage);
                 throw new DomainException($"Mercado Pago no pudo {what} ({(int)res.StatusCode}). Probá de nuevo en unos minutos.");
             }
             return JsonDocument.Parse(body);

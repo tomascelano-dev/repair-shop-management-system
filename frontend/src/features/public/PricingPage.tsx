@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { billingApi } from '../../api/endpoints'
 import type { Plan } from '../../api/types'
 import { Alert, Loading, Select } from '../../components/ui'
-import { billingCountry, COUNTRIES, detectCountry, planPrice } from '../../lib/billing'
+import { currencyName, detectCountry, offeredCountries, planPrice } from '../../lib/billing'
 import { countryName, publicPath, usePublicLocale } from '../../lib/publicLocale'
 import { cn } from '../../lib/cn'
 import { PublicLayout } from './PublicLayout'
@@ -18,8 +18,12 @@ const modules: Record<string, [string, string]> = {
 export function PricingPage({ initialCountry }: { initialCountry?: string } = {}) {
   const locale = usePublicLocale()
   const en = locale === 'en'
-  const [country, setCountry] = useState(() => initialCountry ?? detectCountry())
-  const plans = useQuery({ queryKey: ['plans', billingCountry(country)], queryFn: () => billingApi.plans(billingCountry(country)) })
+  const config = useQuery({ queryKey: ['billing-config'], queryFn: billingApi.config, staleTime: 5 * 60_000 })
+  const offered = offeredCountries(config.data)
+  const [picked, setCountry] = useState<string | null>(initialCountry ?? null)
+  const country = picked && offered.includes(picked) ? picked : detectCountry(offered)
+  const plans = useQuery({ queryKey: ['plans', country], queryFn: () => billingApi.plans(country) })
+  const currency = plans.data?.currency ?? config.data?.countries.find((c) => c.code === country)?.currency ?? 'ARS'
   const features = en ? ['Orders, estimates and workshop board', 'Customer tracking and estimate approval', 'Point of sale, cash register and inventory', 'WhatsApp, email and SMS notifications', 'Unlimited users'] : ['Órdenes, presupuestos y tablero del taller', 'Seguimiento y aprobación de presupuestos para clientes', 'Punto de venta, caja e inventario', 'Avisos por WhatsApp, email y SMS', 'Usuarios ilimitados']
   return (
     <PublicLayout title={en ? 'Pricing' : 'Precios'}>
@@ -28,12 +32,16 @@ export function PricingPage({ initialCountry }: { initialCountry?: string } = {}
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">{en ? 'A plan for every repair shop' : 'El sistema para tu servicio técnico'}</h1>
           <p className="mx-auto mt-3 max-w-2xl text-slate-600">{en ? 'Orders, estimates, inventory, payments and customer updates in one place. Unlimited users on every plan.' : 'Órdenes, presupuestos, inventario, caja y avisos a tus clientes en un solo lugar. Usuarios ilimitados en todos los planes.'}</p>
           <p className="mt-2 text-sm font-medium text-brand-700">{en ? `${plans.data?.trialDays ?? 14} days free. No card required.` : `${plans.data?.trialDays ?? 14} días gratis, sin tarjeta.`}</p>
-          <label className="mt-5 inline-flex items-center gap-2 text-sm text-slate-600">
-            {en ? 'Prices for' : 'Precios para'}
-            <Select value={country} onChange={(e) => setCountry(e.target.value)} className="w-48">
-              {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{countryName(c.code, locale)}</option>)}
-            </Select>
-          </label>
+          {offered.length > 1 ? (
+            <label className="mt-5 inline-flex items-center gap-2 text-sm text-slate-600">
+              {en ? 'Prices for' : 'Precios para'}
+              <Select value={country} onChange={(e) => setCountry(e.target.value)} className="w-48">
+                {offered.map((c) => <option key={c} value={c}>{countryName(c, locale)}</option>)}
+              </Select>
+            </label>
+          ) : (
+            <p className="mt-5 text-sm text-slate-600">{en ? `Available for repair shops in ${countryName(country, locale)}.` : `Disponible para talleres de ${countryName(country, locale)}.`}</p>
+          )}
         </section>
         {plans.isLoading ? <Loading /> : plans.data ? (
           <div className="grid gap-4 md:grid-cols-3">{plans.data.plans.map((p) => <PlanCard key={p.id} plan={p} />)}</div>
@@ -44,9 +52,10 @@ export function PricingPage({ initialCountry }: { initialCountry?: string } = {}
             {features.map((f) => <li key={f} className="flex gap-2"><span aria-hidden="true" className="text-brand-600">✓</span>{f}</li>)}
             {country === 'AR' && <li>{en ? 'ARCA electronic invoicing (Argentina)' : 'Factura electrónica ARCA'}</li>}
           </ul>
-          <p className="mt-4 text-xs text-slate-500">{country === 'AR'
-            ? (en ? 'Final monthly prices in Argentine pesos, charged by Mercado Pago.' : 'Precios finales en pesos argentinos, cobrados por Mercado Pago cada mes.')
-            : (en ? 'Monthly prices in US dollars. Paddle charges your subscription and adds applicable taxes.' : 'Precios mensuales en dólares estadounidenses. Paddle cobra la suscripción y añade los impuestos que correspondan.')}
+          <p className="mt-4 text-xs text-slate-500">
+            {en
+              ? `${country === 'AR' ? 'Final monthly prices' : 'Monthly prices'} in ${currencyName(currency, 'en')}, charged by Mercado Pago with automatic monthly debit.`
+              : `${country === 'AR' ? 'Precios finales' : 'Precios'} en ${currencyName(currency)}, cobrados por Mercado Pago con débito automático cada mes.`}
             {' '}{en ? 'Cancel anytime. You can request a refund of your first payment within 14 days. See our ' : 'Cancela cuando quieras. Puedes solicitar el reembolso del primer pago dentro de los 14 días. Consulta la '}
             <Link to={publicPath(locale, 'refunds')} className="underline">{en ? 'refund policy' : 'política de reembolsos'}</Link>.
           </p>

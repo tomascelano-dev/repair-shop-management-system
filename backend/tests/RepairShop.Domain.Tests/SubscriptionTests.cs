@@ -40,7 +40,7 @@ public sealed class SubscriptionTests
     {
         var sub = Subscription.StartTrial(Org, "AR", 14, Now);
         var periodEnd = Now.AddMonths(1);
-        sub.ApplyProviderState(BillingProvider.Paddle, "sub_1", PlanId.Basic, SubscriptionStatus.Active, periodEnd, 25m, "USD", "ctm_1", Now, Now);
+        sub.ApplyProviderState(BillingProvider.MercadoPago, "pre1", PlanId.Basic, SubscriptionStatus.Active, periodEnd, 29900m, "ARS", "123", Now, Now);
         sub.MarkCanceled(Now.AddDays(3));
 
         sub.HasFullAccess(periodEnd.AddMinutes(-1)).Should().BeTrue();
@@ -60,10 +60,10 @@ public sealed class SubscriptionTests
     public void Out_of_order_provider_events_are_ignored()
     {
         var sub = Subscription.StartTrial(Org, "AR", 14, Now);
-        sub.ApplyProviderState(BillingProvider.Paddle, "sub_1", PlanId.Pro, SubscriptionStatus.Canceled, Now.AddMonths(1), null, null, null, Now.AddMinutes(5), Now)
+        sub.ApplyProviderState(BillingProvider.MercadoPago, "pre1", PlanId.Pro, SubscriptionStatus.Canceled, Now.AddMonths(1), null, null, null, Now.AddMinutes(5), Now)
             .Should().BeTrue();
 
-        var applied = sub.ApplyProviderState(BillingProvider.Paddle, "sub_1", PlanId.Pro, SubscriptionStatus.Active, Now.AddMonths(1), null, null, null, Now, Now);
+        var applied = sub.ApplyProviderState(BillingProvider.MercadoPago, "pre1", PlanId.Pro, SubscriptionStatus.Active, Now.AddMonths(1), null, null, null, Now, Now);
 
         applied.Should().BeFalse();
         sub.Status.Should().Be(SubscriptionStatus.Canceled);
@@ -91,6 +91,29 @@ public sealed class SubscriptionTests
 
         sub.Plan.Should().Be(PlanId.Standard);
         sub.PendingPlan.Should().BeNull();
+    }
+
+    [Fact]
+    public void Legacy_paddle_rows_are_never_live()
+    {
+        var sub = Subscription.StartTrial(Org, "US", 14, Now);
+        sub.ApplyProviderState(BillingProvider.Paddle, "sub_01legacy", PlanId.Pro, SubscriptionStatus.Active, Now.AddMonths(1), 79m, "USD", null, Now, Now);
+
+        sub.HasLiveProviderSubscription.Should().BeFalse("Paddle was removed: plan changes and cancellations cannot go through it");
+        sub.HasFullAccess(Now.AddDays(1)).Should().BeTrue("the period already paid is honored");
+    }
+
+    [Fact]
+    public void Billing_country_cannot_change_under_a_running_subscription()
+    {
+        var sub = Subscription.StartTrial(Org, "AR", 14, Now);
+        sub.SetBillingCountry("uy", Now);
+        sub.BillingCountry.Should().Be("UY");
+
+        sub.ApplyProviderState(BillingProvider.MercadoPago, "pre1", PlanId.Basic, SubscriptionStatus.Active, Now.AddMonths(1), null, null, null, Now, Now);
+        var act = () => sub.SetBillingCountry("AR", Now);
+        act.Should().Throw<DomainException>();
+        sub.SetBillingCountry("UY", Now); // same country: fine
     }
 
     [Theory]

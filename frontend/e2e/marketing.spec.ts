@@ -25,7 +25,7 @@ test('an ad landing keeps campaign data through English signup and waits for con
   await page.getByLabel('Your name').fill('Global Owner')
   await page.getByLabel('Email', { exact: true }).fill(`global${Date.now()}@example.com`)
   await page.getByLabel('Password', { exact: true }).fill('Clave12345')
-  await page.getByLabel('Country', { exact: true }).selectOption('US')
+  await page.getByLabel('Country', { exact: true }).selectOption('AR')
   await page.getByRole('checkbox').check()
   const request = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/auth/signup'))
   await page.getByRole('button', { name: 'Create my account' }).click()
@@ -51,11 +51,10 @@ test('visitors can reject cookies, switch legal languages and reopen their prefe
   await expect(page.getByRole('button', { name: 'Solo necesarias' })).toBeVisible()
 })
 
-test('English prices use the international currency and all legal pages are reachable', async ({ page }) => {
+test('English prices are in the local currency and all legal pages are reachable', async ({ page }) => {
   await page.goto('/en/pricing')
-  await page.getByLabel('Prices for').selectOption('US')
   await expect(page.getByRole('heading', { name: 'Professional', exact: true })).toBeVisible()
-  await expect(page.getByText('$25', { exact: true })).toBeVisible()
+  await expect(page.getByText(/Argentine pesos, charged by Mercado Pago/)).toBeVisible()
   for (const [link, heading] of [['Terms', 'Terms of service'], ['Privacy', 'Privacy policy'], ['Refunds', 'Refund policy']]) {
     await page.getByRole('contentinfo').getByRole('link', { name: link, exact: true }).click()
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()

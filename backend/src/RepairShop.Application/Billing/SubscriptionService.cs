@@ -16,15 +16,15 @@ public sealed record SubscriptionAccess(bool HasFullAccess, PlanDefinition Plan,
 }
 
 /// <summary>
-/// Plans, checkout and the subscription lifecycle. Argentina pays in pesos through Mercado Pago; every other
-/// country pays in dollars through Paddle (merchant of record: it charges and remits each country's taxes).
+/// Plans, checkout and the subscription lifecycle. Every offered country pays in its own currency through the
+/// platform's Mercado Pago account in that country (see <see cref="BillingOptions.Countries"/>).
 /// </summary>
 public sealed class SubscriptionService
 {
     private readonly ISubscriptionRepository _subscriptions;
     private readonly IShopRepository _shops;
     private readonly IUserRepository _users;
-    private readonly IEnumerable<ISubscriptionGateway> _gateways;
+    private readonly ISubscriptionGateway _gateway;
     private readonly IUnitOfWork _uow;
     private readonly IDateTimeProvider _clock;
     private readonly IAppLinks _links;
@@ -37,7 +37,7 @@ public sealed class SubscriptionService
         ISubscriptionRepository subscriptions,
         IShopRepository shops,
         IUserRepository users,
-        IEnumerable<ISubscriptionGateway> gateways,
+        ISubscriptionGateway gateway,
         IUnitOfWork uow,
         IDateTimeProvider clock,
         IAppLinks links,
@@ -49,7 +49,7 @@ public sealed class SubscriptionService
         _subscriptions = subscriptions;
         _shops = shops;
         _users = users;
-        _gateways = gateways;
+        _gateway = gateway;
         _uow = uow;
         _clock = clock;
         _links = links;
@@ -59,15 +59,15 @@ public sealed class SubscriptionService
         _logger = logger;
     }
 
-    public static string CurrencyFor(string country) => string.Equals(country, "AR", StringComparison.OrdinalIgnoreCase) ? "ARS" : "USD";
+    /// <summary>Currency the country pays in (Mercado Pago countries); USD only labels legacy accounts from elsewhere.</summary>
+    public static string CurrencyFor(string country) => MercadoPagoCountries.CurrencyFor(country) ?? "USD";
 
-    public static BillingProvider ProviderFor(string country) => string.Equals(country, "AR", StringComparison.OrdinalIgnoreCase) ? BillingProvider.MercadoPago : BillingProvider.Paddle;
-
+    /// <summary>Public price list. Countries where RepairShop is not sold get the first offered country (Argentina).</summary>
     public PlansResponse ListPlans(string? country)
     {
-        var c = string.IsNullOrWhiteSpace(country) ? "US" : Subscription.NormalizeCountry(country);
-        var currency = CurrencyFor(c);
-        return new PlansResponse(c, currency, _options.TrialDays, Plans.All.Select(p => ToResponse(p, currency)).ToList());
+        var requested = (country ?? "").Trim().ToUpperInvariant();
+        var c = _options.IsOffered(requested) ? requested : _options.OfferedCountries().FirstOrDefault() ?? "AR";
+        return new PlansResponse(c, CurrencyFor(c), _options.TrialDays, Plans.All.Select(p => ToResponse(p, c)).ToList());
     }
 
     public async Task<SubscriptionAccess> GetAccessAsync(Guid organizationId, CancellationToken ct)
@@ -102,14 +102,17 @@ public sealed class SubscriptionService
         if (sub.Provider == BillingProvider.Manual && sub.Status == SubscriptionStatus.Active)
             throw new DomainException("Tu plan está bonificado. Escribinos si querés cambiarlo.");
 
-        var currency = CurrencyFor(sub.BillingCountry);
-        var price = _options.PriceFor(planId, currency) ?? throw new DomainException("Ese plan no tiene precio configurado.");
+        var country = sub.BillingCountry;
+        var currency = CurrencyFor(country);
+        if (!_options.IsOffered(country))
+            throw new DomainException("Todavía no cobramos online en tu país. Escribinos y activamos tu plan a mano.");
+        var price = _options.PriceFor(planId, country) ?? throw new DomainException("Ese plan no tiene precio configurado.");
 
         if (sub.HasLiveProviderSubscription)
         {
             if (sub.Plan == planId && sub.EffectiveStatus(now) == SubscriptionStatus.Active) throw new DomainException($"Ya estás en el plan {plan.Name}.");
-            var live = Gateway(sub.Provider) ?? throw new DomainException("El cobro de suscripciones no está disponible en este momento.");
-            await live.ChangePlanAsync(sub.ProviderSubscriptionId!, planId, price, currency, ct);
+            if (!_gateway.IsConfigured(country)) throw new DomainException("El cobro de suscripciones no está disponible en este momento.");
+            await _gateway.ChangePlanAsync(country, sub.ProviderSubscriptionId!, planId, price, currency, ct);
             var from = sub.Plan;
             sub.ChangePlanLocally(planId, now);
             await AuditAsync(organizationId, "subscription_plan_changed", actor, new { from = from.ToString(), to = planId.ToString() }, ct);
@@ -117,13 +120,10 @@ public sealed class SubscriptionService
             return new CheckoutResponse(null, true);
         }
 
-        var gateway = Gateway(ProviderFor(sub.BillingCountry));
-        if (gateway is null)
+        if (!_gateway.IsConfigured(country))
         {
-            if (!_options.AllowSimulated)
-                throw new DomainException("El cobro de suscripciones todavía no está habilitado. Escribinos y activamos tu plan a mano.");
-
-            // Development/tests: no provider configured, activate right away for one month.
+            // IsOffered without credentials only happens with AllowSimulated (development/tests): activate right away for one month.
+            if (!_options.AllowSimulated) throw new DomainException("El cobro de suscripciones no está disponible en este momento.");
             sub.ApplyProviderState(BillingProvider.Simulated, $"sim_{Guid.NewGuid():N}", planId, SubscriptionStatus.Active,
                 now.AddMonths(1), price, currency, null, now, now);
             await AuditAsync(organizationId, "subscription_simulated", actor, new { plan = planId.ToString() }, ct);
@@ -132,14 +132,13 @@ public sealed class SubscriptionService
         }
 
         var user = await _users.GetByIdAsync(userId, ct) ?? throw new UnauthorizedException("Sesión inválida.");
-        var checkout = await gateway.CreateCheckoutAsync(new GatewayCheckoutRequest(
+        var checkout = await _gateway.CreateCheckoutAsync(country, new GatewayCheckoutRequest(
             organizationId, planId, price, currency, user.Email,
             $"RepairShop {plan.Name} (mensual)",
-            _links.Billing(),
-            $"{_links.ApiBase}/api/v1/billing/webhooks/{gateway.Provider.ToString().ToLowerInvariant()}"), ct);
+            _links.Billing()), ct);
 
-        sub.BeginCheckout(planId, gateway.Provider, checkout.ProviderSubscriptionId, now);
-        await AuditAsync(organizationId, "subscription_checkout_started", actor, new { plan = planId.ToString(), provider = gateway.Provider.ToString() }, ct);
+        sub.BeginCheckout(planId, BillingProvider.MercadoPago, checkout.ProviderSubscriptionId, now);
+        await AuditAsync(organizationId, "subscription_checkout_started", actor, new { plan = planId.ToString(), provider = nameof(BillingProvider.MercadoPago), country }, ct);
         await _uow.SaveChangesAsync(ct);
         return new CheckoutResponse(checkout.Url, false);
     }
@@ -154,8 +153,8 @@ public sealed class SubscriptionService
 
         if (sub.HasLiveProviderSubscription)
         {
-            var gateway = Gateway(sub.Provider) ?? throw new DomainException("El cobro de suscripciones no está disponible en este momento.");
-            await gateway.CancelAsync(sub.ProviderSubscriptionId!, ct);
+            if (!_gateway.IsConfigured(sub.BillingCountry)) throw new DomainException("El cobro de suscripciones no está disponible en este momento.");
+            await _gateway.CancelAsync(sub.BillingCountry, sub.ProviderSubscriptionId!, ct);
         }
 
         sub.MarkCanceled(_clock.UtcNow);
@@ -181,53 +180,43 @@ public sealed class SubscriptionService
 
     // ===== Webhooks =====
 
-    /// <summary>Mercado Pago preapproval notifications. Not accepted when the signature is invalid.</summary>
-    public async Task<WebhookOutcome> HandleMercadoPagoWebhookAsync(MercadoPagoNotification n, CancellationToken ct)
+    /// <summary>
+    /// Mercado Pago preapproval notifications sent by the platform's account in <paramref name="country"/>.
+    /// Not accepted when that account is not configured or the signature is invalid.
+    /// </summary>
+    public async Task<WebhookOutcome> HandleMercadoPagoWebhookAsync(string country, MercadoPagoNotification n, CancellationToken ct)
     {
-        var gateway = Gateway(BillingProvider.MercadoPago) as IMercadoPagoSubscriptionGateway;
-        if (gateway is null) return WebhookOutcome.Rejected;
-        if (!MercadoPagoSignature.IsValid(_options.MercadoPago.WebhookSecret, n.Signature, n.RequestId, n.DataId, _clock.UtcNow, TimeSpan.FromMinutes(15)))
+        country = (country ?? "").Trim().ToUpperInvariant();
+        var account = _options.Account(country);
+        if (account is null || !_gateway.IsConfigured(country)) return WebhookOutcome.Rejected;
+        if (!MercadoPagoSignature.IsValid(account.WebhookSecret, n.Signature, n.RequestId, n.DataId, _clock.UtcNow, TimeSpan.FromMinutes(15)))
         {
-            _logger.LogWarning("Rejected Mercado Pago subscription webhook with an invalid signature.");
+            _logger.LogWarning("Rejected Mercado Pago subscription webhook for {Country} with an invalid signature.", country);
             return WebhookOutcome.Rejected;
         }
 
         string? preapprovalId = n.Type switch
         {
             "subscription_preapproval" or "preapproval" => n.DataId,
-            "subscription_authorized_payment" or "authorized_payment" => await gateway.GetPreapprovalIdForPaymentAsync(n.DataId!, ct),
+            "subscription_authorized_payment" or "authorized_payment" => await _gateway.GetPreapprovalIdForPaymentAsync(country, n.DataId!, ct),
             _ => null
         };
         if (preapprovalId is null) return WebhookOutcome.Ignored; // other topics: acknowledged, nothing to do
 
-        var state = await gateway.GetSubscriptionAsync(preapprovalId, ct);
+        // The state is read from Mercado Pago with the country's own token: the webhook body is never trusted.
+        var state = await _gateway.GetSubscriptionAsync(country, preapprovalId, ct);
         if (state is null) return WebhookOutcome.Ignored;
-        return new WebhookOutcome(true, await _uow.RetryOnConflictAsync(c => ApplyAsync(BillingProvider.MercadoPago, state, c), ct, maxAttempts: 6));
-    }
-
-    /// <summary>Paddle Billing notifications (subscription.*). Not accepted when the signature is invalid.</summary>
-    public async Task<WebhookOutcome> HandlePaddleWebhookAsync(string rawBody, string? signature, CancellationToken ct)
-    {
-        var gateway = Gateway(BillingProvider.Paddle) as IPaddleSubscriptionGateway;
-        if (gateway is null) return WebhookOutcome.Rejected;
-        if (!PaddleSignature.IsValid(_options.Paddle.WebhookSecret, signature, rawBody, _clock.UtcNow))
-        {
-            _logger.LogWarning("Rejected Paddle webhook with an invalid signature.");
-            return WebhookOutcome.Rejected;
-        }
-
-        var state = gateway.ParseWebhook(rawBody);
-        if (state is null) return WebhookOutcome.Ignored;
-        return new WebhookOutcome(true, await _uow.RetryOnConflictAsync(c => ApplyAsync(BillingProvider.Paddle, state, c), ct, maxAttempts: 6));
+        return new WebhookOutcome(true, await _uow.RetryOnConflictAsync(c => ApplyAsync(country, state, c), ct, maxAttempts: 6));
     }
 
     /// <summary>
-    /// Applies the provider state and returns the organization it belongs to (null when unknown). Providers send
-    /// several events for one subscription at the same moment (Paddle: subscription.created and .activated), so
-    /// callers retry on a row version conflict instead of failing the webhook.
+    /// Applies the provider state and returns the organization it belongs to (null when unknown). Mercado Pago can
+    /// send several notifications for one subscription at the same moment, so callers retry on a row version
+    /// conflict instead of failing the webhook.
     /// </summary>
-    private async Task<Guid?> ApplyAsync(BillingProvider provider, GatewaySubscriptionState state, CancellationToken ct)
+    private async Task<Guid?> ApplyAsync(string country, GatewaySubscriptionState state, CancellationToken ct)
     {
+        const BillingProvider provider = BillingProvider.MercadoPago;
         var now = _clock.UtcNow;
         var sub = await _subscriptions.GetByProviderIdAsync(provider, state.ProviderSubscriptionId, ct);
         if (sub is null && state.OrganizationId is { } orgId) sub = await _subscriptions.GetByOrganizationAsync(orgId, ct);
@@ -235,6 +224,13 @@ public sealed class SubscriptionService
         {
             _logger.LogWarning("{Provider} subscription {Id} does not match any organization.", provider, state.ProviderSubscriptionId);
             return null;
+        }
+        if (!string.Equals(sub.BillingCountry, country, StringComparison.OrdinalIgnoreCase))
+        {
+            // Plan changes and cancellations go through the billing country's account: never link another country's.
+            _logger.LogWarning("Mercado Pago {Country} subscription {Id} belongs to an organization billed in {BillingCountry}; ignored.",
+                country, state.ProviderSubscriptionId, sub.BillingCountry);
+            return sub.OrganizationId;
         }
         if (state.Status is null) return sub.OrganizationId;
 
@@ -254,16 +250,13 @@ public sealed class SubscriptionService
         // A new subscription replaced a running one (paid again from a fresh checkout): stop the old charges.
         if (wasLive && previous is not null && previous != state.ProviderSubscriptionId && state.Status == SubscriptionStatus.Active)
         {
-            try { await Gateway(provider)!.CancelAsync(previous, ct); }
+            try { await _gateway.CancelAsync(country, previous, ct); }
             catch (Exception ex) { _logger.LogError(ex, "Could not cancel replaced {Provider} subscription {Id}.", provider, previous); }
         }
         return sub.OrganizationId;
     }
 
     // ---------------------------------------------------------------------------------------------
-
-    private ISubscriptionGateway? Gateway(BillingProvider provider)
-        => _gateways.FirstOrDefault(g => g.Provider == provider && g.IsConfigured);
 
     private async Task<Subscription> GetSubscriptionAsync(Guid organizationId, CancellationToken ct)
         => await _subscriptions.GetByOrganizationAsync(organizationId, ct) ?? throw new NotFoundException("La organización no tiene suscripción.");
@@ -275,8 +268,7 @@ public sealed class SubscriptionService
     {
         var now = _clock.UtcNow;
         var plan = sub.PlanDefinition;
-        var currency = CurrencyFor(sub.BillingCountry);
-        var checkoutAvailable = _options.AllowSimulated || Gateway(ProviderFor(sub.BillingCountry)) is not null;
+        var checkoutAvailable = _options.IsOffered(sub.BillingCountry);
         return new SubscriptionResponse(
             sub.Plan.ToString(),
             plan.Name,
@@ -297,12 +289,13 @@ public sealed class SubscriptionService
             sub.HasLiveProviderSubscription,
             checkoutAvailable,
             emailVerified,
-            Plans.All.Select(p => ToResponse(p, currency)).ToList(),
+            Plans.All.Select(p => ToResponse(p, sub.BillingCountry)).ToList(),
             AdConversionService.PurchaseEventId(sub));
     }
 
-    private PlanResponse ToResponse(PlanDefinition p, string currency)
-        => new(p.Id.ToString(), p.Name, p.MaxBranches, p.Modules, _options.PriceFor(p.Id, currency), currency);
+    /// <summary>Plan with its price in the country's currency (no price where RepairShop is not sold).</summary>
+    private PlanResponse ToResponse(PlanDefinition p, string country)
+        => new(p.Id.ToString(), p.Name, p.MaxBranches, p.Modules, _options.IsOffered(country) ? _options.PriceFor(p.Id, country) : null, CurrencyFor(country));
 
     private async Task AuditAsync(Guid organizationId, string action, Actor actor, object data, CancellationToken ct)
     {
@@ -319,16 +312,4 @@ public sealed record WebhookOutcome(bool Accepted, Guid? OrganizationId)
 {
     public static readonly WebhookOutcome Rejected = new(false, null);
     public static readonly WebhookOutcome Ignored = new(true, null);
-}
-
-public interface IMercadoPagoSubscriptionGateway : ISubscriptionGateway
-{
-    /// <summary>Preapproval (subscription) id of a recurring charge notification.</summary>
-    Task<string?> GetPreapprovalIdForPaymentAsync(string authorizedPaymentId, CancellationToken ct);
-}
-
-public interface IPaddleSubscriptionGateway : ISubscriptionGateway
-{
-    /// <summary>Subscription state from a (signature-checked) webhook body; null for events that don't matter.</summary>
-    GatewaySubscriptionState? ParseWebhook(string rawBody);
 }

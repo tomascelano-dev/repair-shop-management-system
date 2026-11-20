@@ -5,7 +5,7 @@ import { billingApi } from '../../api/endpoints'
 import { PublicLayout } from './PublicLayout'
 import { publicPath, usePublicLocale } from '../../lib/publicLocale'
 
-const UPDATED = '3 de octubre de 2026'
+const UPDATED = '20 de noviembre de 2026'
 
 function useLegalConfig() {
   return useQuery({ queryKey: ['billing-config'], queryFn: billingApi.config, staleTime: 5 * 60_000 }).data
@@ -48,7 +48,7 @@ function LegalPage({ title, children }: { title: string; children: ReactNode }) 
     <PublicLayout title={title}>
       <main className="mx-auto max-w-3xl px-4 pb-6">
         <article className="space-y-3 rounded-2xl bg-white p-6 text-sm leading-relaxed text-slate-700 shadow-sm ring-1 ring-slate-200 sm:p-8 [&_h2]:pt-3 [&_h2]:font-semibold [&_h2]:text-slate-900">
-          <p className="text-xs uppercase tracking-wide text-slate-500">{en ? 'Updated October 3, 2026' : `Actualizado el ${UPDATED}`} </p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">{en ? 'Updated November 20, 2026' : `Actualizado el ${UPDATED}`} </p>
           <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
           {children}
         </article>
@@ -75,9 +75,9 @@ export function TermsPage() {
       <h2>2. Prueba gratis, planes y pagos</h2>
       <p>
         Cada cuenta nueva incluye una prueba gratis con todos los módulos y sin tarjeta. Al terminar, la cuenta queda en modo consulta hasta que elijas un plan
-        mensual. En Argentina el abono se cobra en pesos con Mercado Pago. En el resto de los países lo cobra en dólares Paddle.com, que actúa como revendedor
-        autorizado (merchant of record) y agrega los impuestos que correspondan en tu país. El abono se cobra por mes adelantado y puedes cancelarlo cuando
-        quieras desde la sección Suscripción; la cancelación rige al final del período pagado. Los reintegros se rigen por la <RefundLink />.
+        mensual. RepairShop se ofrece en Argentina y en los demás países que se indican al registrarte, donde el abono se cobra con Mercado Pago en la moneda
+        local (pesos en Argentina), mediante una suscripción con débito automático. El abono se cobra por mes adelantado y puedes cancelarlo cuando quieras
+        desde la sección Suscripción; la cancelación rige al final del período pagado. Los reintegros se rigen por la <RefundLink />.
       </p>
       <h2>3. Cambios en el servicio</h2>
       <p>
@@ -133,8 +133,8 @@ export function PrivacyPage() {
       </p>
       <h2>4. Con quién los compartimos</h2>
       <p>
-        Con proveedores necesarios para operar: alojamiento, envío de emails, SMS y WhatsApp, cobro de la suscripción (Mercado Pago en Argentina y Paddle en el
-        resto de los países) y ARCA para la facturación electrónica. Cada uno recibe solo lo necesario para su función. Algunos de ellos procesan datos fuera de
+        Con proveedores necesarios para operar: alojamiento, envío de emails, SMS y WhatsApp, cobro de la suscripción (Mercado Pago) y ARCA para la
+        facturación electrónica. Cada uno recibe solo lo necesario para su función. Algunos de ellos procesan datos fuera de
         tu país, con las garantías que exige la normativa aplicable.
       </p>
       <h2>5. Seguridad y conservación</h2>
@@ -177,12 +177,8 @@ export function RefundPage() {
       <p>Si te cobramos dos veces el mismo período, o después de que cancelaste, te devolvemos el importe completo.</p>
       <h2>4. Cómo pedirlo</h2>
       <p>
-        Escríbenos por <Contact /> desde el email de tu cuenta. Fuera de Argentina el pago lo procesa Paddle.com, que hace el reintegro; también puedes pedirlo
-        directamente en{' '}
-        <a href="https://paddle.net" target="_blank" rel="noreferrer" className="text-brand-700 underline">
-          paddle.net
-        </a>
-        . En Argentina el reintegro se hace por Mercado Pago, y también puedes ejercer el derecho de arrepentimiento dentro de los 10 días de la contratación.
+        Escríbenos por <Contact /> desde el email de tu cuenta. El pago lo procesa Mercado Pago y el reintegro se hace por el mismo medio. En Argentina
+        también puedes ejercer el derecho de arrepentimiento dentro de los 10 días de la contratación, por el mismo canal.
       </p>
       <h2>5. Plazos</h2>
       <p>
@@ -199,7 +195,7 @@ function EnglishLegalPage({ page }: { page: 'terms' | 'privacy' | 'refund' }) {
       <h2>1. Account and use</h2>
       <p>You are responsible for accurate account information, keeping your passwords confidential and the actions of users you invite. You may not use the service for unlawful activities or unsolicited communications.</p>
       <h2>2. Free trial, plans and payments</h2>
-      <p>New accounts include a free trial with all modules and no card required. After the trial, your account becomes read-only until you choose a monthly plan. In Argentina, Mercado Pago charges in Argentine pesos. Elsewhere, Paddle.com acts as our authorized reseller and merchant of record, charging in US dollars plus applicable taxes. Subscriptions are billed monthly in advance. You can cancel from the Subscription page at any time; cancellation takes effect at the end of the paid period. Refunds follow our <RefundLink />.</p>
+      <p>New accounts include a free trial with all modules and no card required. After the trial, your account becomes read-only until you choose a monthly plan. RepairShop is offered in Argentina and in the other countries listed at signup, where Mercado Pago charges the subscription in the local currency (Argentine pesos in Argentina) by automatic monthly debit. Subscriptions are billed monthly in advance. You can cancel from the Subscription page at any time; cancellation takes effect at the end of the paid period. Refunds follow our <RefundLink />.</p>
       <h2>3. Changes to the service</h2>
       <p>We may add, change or remove features. We will notify you in advance of changes that affect features you use or your plan price.</p>
       <h2>4. Your data</h2>
@@ -222,7 +218,7 @@ function EnglishLegalPage({ page }: { page: 'terms' | 'privacy' | 'refund' }) {
       <h2>3. Your shop’s role</h2>
       <p>Your shop is the controller of its customers’ data. RepairShop acts as a processor and uses that data only to provide the service to your shop.</p>
       <h2>4. Service providers</h2>
-      <p>We share necessary data with hosting, email, SMS and WhatsApp providers, Mercado Pago in Argentina, Paddle elsewhere, and ARCA for electronic invoicing. Some providers process data outside your country, subject to safeguards required by applicable law.</p>
+      <p>We share necessary data with hosting, email, SMS and WhatsApp providers, Mercado Pago for subscription payments, and ARCA for electronic invoicing. Some providers process data outside your country, subject to safeguards required by applicable law.</p>
       <h2>5. Security and retention</h2>
       <p>We use encrypted connections, protected passwords, separation between shops and daily backups. We retain data while your account is active and for the periods required by tax rules.</p>
       <h2>Cookies and campaign measurement</h2>
@@ -241,7 +237,7 @@ function EnglishLegalPage({ page }: { page: 'terms' | 'privacy' | 'refund' }) {
       <h2>3. Incorrect charges</h2>
       <p>If you are charged twice for the same period or after cancellation has taken effect, we refund the full incorrect charge.</p>
       <h2>4. How to request a refund</h2>
-      <p>Contact <Contact /> using your account email. Outside Argentina, Paddle.com processes payments and refunds; you may also request a refund at <a href="https://paddle.net" className="text-brand-700 underline">paddle.net</a>. In Argentina, refunds use Mercado Pago, and you may also exercise your right to withdraw within 10 days of contracting.</p>
+      <p>Contact <Contact /> using your account email. Mercado Pago processes payments, and refunds go back through it. In Argentina, you may also exercise your right to withdraw within 10 days of contracting.</p>
       <h2>5. Timing</h2>
       <p>We respond within five business days. After approval, funds return to the original payment method according to your bank or card provider’s processing times.</p>
     </LegalPage>

@@ -29,10 +29,11 @@ public sealed class BillingTests
         sub.Str("plan").Should().Be("Pro");
         sub.GetProperty("trialDaysLeft").GetInt32().Should().Be(14);
         sub.Str("billingCountry").Should().Be("MX");
-        sub.GetProperty("plans")[0].Str("currency").Should().Be("USD");
+        sub.GetProperty("plans")[0].Str("currency").Should().Be("MXN");
+        sub.GetProperty("checkoutAvailable").GetBoolean().Should().BeTrue();
 
         var settings = await (await owner.Get("/settings")).DataAsync();
-        settings.ToString().Should().Contain("USD").And.Contain("America/Mexico_City");
+        settings.ToString().Should().Contain("MXN").And.Contain("America/Mexico_City");
 
         // The owner works right away (templates were provisioned too).
         await owner.CreateOrderAsync("Pantalla rota");
@@ -57,6 +58,21 @@ public sealed class BillingTests
             shopName = "Otro taller", ownerName = "Otra persona", email = "nuevo-sin-terminos@example.com", password = "Clave12345", country = "AR", acceptTerms = false
         });
         res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [IntegrationTheory]
+    [InlineData("US")] // Mercado Pago does not sell subscriptions there
+    [InlineData("ES")]
+    [InlineData("CL")] // Mercado Pago country without a configured account
+    public async Task Signup_is_only_open_to_countries_where_mercado_pago_charges(string country)
+    {
+        var anon = _factory.CreateClient();
+        var res = await anon.PostAsJsonAsync("/api/v1/auth/signup", new
+        {
+            shopName = "Taller de afuera", ownerName = "Persona", email = $"out{Guid.NewGuid():N}"[..20] + "@example.com", password = "Clave12345", country, acceptTerms = true
+        });
+        res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        Regex.Unescape(await res.Content.ReadAsStringAsync()).Should().Contain("Argentina y México", "the message lists the countries where RepairShop is sold");
     }
 
     [IntegrationFact]
@@ -120,66 +136,62 @@ public sealed class BillingTests
     }
 
     [IntegrationFact]
-    public async Task Paddle_webhooks_activate_the_plan_only_with_a_valid_signature()
+    public async Task Mercado_pago_checkout_activates_the_plan_only_after_a_signed_notification()
     {
-        var (owner, login) = await ApiClient.SignupAsync(_factory, "ES");
-        var org = login.GetProperty("user").Str("organizationId");
-        var anon = _factory.CreateClient();
-        var body = JsonSerializer.Serialize(new
-        {
-            event_id = "evt_1",
-            event_type = "subscription.created",
-            occurred_at = DateTime.UtcNow.ToString("O"),
-            data = new
-            {
-                id = "sub_01test",
-                status = "active",
-                customer_id = "ctm_01test",
-                currency_code = "USD",
-                custom_data = new { organization_id = org, plan = "Basic" },
-                current_billing_period = new { starts_at = DateTime.UtcNow.ToString("O"), ends_at = DateTime.UtcNow.AddMonths(1).ToString("O") },
-                items = new[] { new { price = new { id = "pri_standard", unit_price = new { amount = "4500", currency_code = "USD" } } } }
-            }
-        });
+        var (owner, _) = await ApiClient.SignupAsync(_factory, "MX");
 
-        (await PostPaddleAsync(anon, body, "wrong-secret")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await PostPaddleAsync(anon, body, ApiFactory.PaddleWebhookSecret)).StatusCode.Should().Be(HttpStatusCode.OK);
+        var checkout = await (await owner.Post("/billing/checkout", new { plan = "Standard" })).DataAsync();
+        checkout.GetProperty("changed").GetBoolean().Should().BeFalse();
+        var url = checkout.Str("url");
+        url.Should().StartWith("https://www.mercadopago.com.mx/subscriptions/checkout?preapproval_id=");
+        var preapprovalId = url.Split('=')[1];
+        var created = _factory.MercadoPago.Preapproval(preapprovalId)!;
+        created["auto_recurring"]!["transaction_amount"]!.GetValue<decimal>().Should().Be(799m);
+        created["auto_recurring"]!["currency_id"]!.GetValue<string>().Should().Be("MXN");
+
+        // Not paid yet: still on the trial.
+        (await (await owner.Get("/billing/subscription")).DataAsync()).Str("status").Should().Be("Trialing");
+
+        _factory.MercadoPago.Authorize(preapprovalId, DateTime.UtcNow.AddMonths(1));
+        var anon = _factory.CreateClient();
+        var forged = FakeMercadoPago.Notification("/api/v1/billing/webhooks/mercadopago/mx", "subscription_preapproval", preapprovalId, "wrong-secret");
+        (await anon.SendAsync(forged)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        var toArgentina = FakeMercadoPago.Notification("/api/v1/billing/webhooks/mercadopago", "subscription_preapproval", preapprovalId, ApiFactory.MexicoWebhookSecret);
+        (await anon.SendAsync(toArgentina)).StatusCode.Should().Be(HttpStatusCode.Unauthorized, "Argentina's account is not configured in tests");
+        var genuine = FakeMercadoPago.Notification("/api/v1/billing/webhooks/mercadopago/mx", "subscription_preapproval", preapprovalId, ApiFactory.MexicoWebhookSecret);
+        (await anon.SendAsync(genuine)).StatusCode.Should().Be(HttpStatusCode.OK);
 
         var sub = await (await owner.Get("/billing/subscription")).DataAsync();
         sub.Str("status").Should().Be("Active");
-        sub.Str("plan").Should().Be("Standard", "the price id decides the plan");
-        sub.Str("provider").Should().Be("Paddle");
-        sub.Dec("amount").Should().Be(45m);
+        sub.Str("plan").Should().Be("Standard");
+        sub.Str("provider").Should().Be("MercadoPago");
+        sub.Dec("amount").Should().Be(799m);
+        sub.Str("currency").Should().Be("MXN");
         sub.GetProperty("canManageAtProvider").GetBoolean().Should().BeTrue();
+
+        // Plan change updates the amount at Mercado Pago; cancelling stops the charges there.
+        (await (await owner.Post("/billing/checkout", new { plan = "Pro" })).DataAsync()).GetProperty("changed").GetBoolean().Should().BeTrue();
+        _factory.MercadoPago.Preapproval(preapprovalId)!["auto_recurring"]!["transaction_amount"]!.GetValue<decimal>().Should().Be(1399m);
+        (await (await owner.Post("/billing/cancel")).DataAsync()).Str("status").Should().Be("Canceled");
+        _factory.MercadoPago.Preapproval(preapprovalId)!["status"]!.GetValue<string>().Should().Be("cancelled");
     }
 
     [IntegrationFact]
-    public async Task Paddle_events_for_the_same_subscription_arriving_together_are_all_accepted()
+    public async Task Notifications_for_the_same_subscription_arriving_together_are_all_accepted()
     {
-        // Paddle sends subscription.created, .activated and .updated at the same moment after a checkout.
-        var (owner, login) = await ApiClient.SignupAsync(_factory, "US");
-        var org = login.GetProperty("user").Str("organizationId");
-        var anon = _factory.CreateClient();
-        var start = DateTime.UtcNow;
-        string Event(int n, string type) => JsonSerializer.Serialize(new
-        {
-            event_id = $"evt_burst_{n}",
-            event_type = type,
-            occurred_at = start.AddMilliseconds(n).ToString("O"),
-            data = new
-            {
-                id = "sub_01burst",
-                status = "active",
-                customer_id = "ctm_01burst",
-                currency_code = "USD",
-                custom_data = new { organization_id = org, plan = "Basic" },
-                current_billing_period = new { starts_at = start.ToString("O"), ends_at = start.AddMonths(1).ToString("O") },
-                items = new[] { new { price = new { id = "pri_basic", unit_price = new { amount = "2500", currency_code = "USD" } } } }
-            }
-        });
+        var (owner, _) = await ApiClient.SignupAsync(_factory, "MX");
+        var url = (await (await owner.Post("/billing/checkout", new { plan = "Basic" })).DataAsync()).Str("url");
+        var preapprovalId = url.Split('=')[1];
+        _factory.MercadoPago.Authorize(preapprovalId, DateTime.UtcNow.AddMonths(1));
+        var payment = _factory.MercadoPago.AddAuthorizedPayment(preapprovalId);
 
-        var types = new[] { "subscription.created", "subscription.activated", "subscription.updated", "subscription.updated" };
-        var responses = await Task.WhenAll(types.Select((t, i) => PostPaddleAsync(anon, Event(i, t), ApiFactory.PaddleWebhookSecret)));
+        var anon = _factory.CreateClient();
+        var path = "/api/v1/billing/webhooks/mercadopago/MX";
+        var responses = await Task.WhenAll(
+            anon.SendAsync(FakeMercadoPago.Notification(path, "subscription_preapproval", preapprovalId, ApiFactory.MexicoWebhookSecret)),
+            anon.SendAsync(FakeMercadoPago.Notification(path, "subscription_preapproval", preapprovalId, ApiFactory.MexicoWebhookSecret)),
+            anon.SendAsync(FakeMercadoPago.Notification(path, "subscription_authorized_payment", payment, ApiFactory.MexicoWebhookSecret)),
+            anon.SendAsync(FakeMercadoPago.Notification(path, "payment", "999", ApiFactory.MexicoWebhookSecret)));
 
         responses.Select(r => r.StatusCode).Should().AllBeEquivalentTo(HttpStatusCode.OK);
         var sub = await (await owner.Get("/billing/subscription")).DataAsync();
@@ -188,20 +200,33 @@ public sealed class BillingTests
     }
 
     [IntegrationFact]
-    public async Task Public_price_list_is_in_pesos_for_argentina_and_dollars_elsewhere()
+    public async Task Public_price_list_uses_the_country_currency_and_falls_back_to_argentina()
     {
         var anon = _factory.CreateClient();
         var ar = await (await anon.GetAsync("/api/v1/billing/plans?country=AR")).DataAsync();
         ar.Str("currency").Should().Be("ARS");
         ar.GetProperty("plans").GetArrayLength().Should().Be(3);
 
-        var us = await (await anon.GetAsync("/api/v1/billing/plans")).DataAsync();
-        us.Str("currency").Should().Be("USD");
-        us.GetProperty("plans")[0].Dec("price").Should().BeGreaterThan(0);
+        var mx = await (await anon.GetAsync("/api/v1/billing/plans?country=mx")).DataAsync();
+        mx.Str("country").Should().Be("MX");
+        mx.Str("currency").Should().Be("MXN");
+        mx.GetProperty("plans")[0].Dec("price").Should().Be(449m);
+
+        foreach (var other in new[] { "", "?country=US", "?country=xyz" })
+        {
+            var fallback = await (await anon.GetAsync("/api/v1/billing/plans" + other)).DataAsync();
+            fallback.Str("country").Should().Be("AR");
+            fallback.Str("currency").Should().Be("ARS");
+        }
 
         var config = await (await anon.GetAsync("/api/v1/billing/config")).DataAsync();
         config.GetProperty("signupEnabled").GetBoolean().Should().BeTrue();
-        config.Str("paddleClientToken").Should().Be("test_client_token");
+        config.GetProperty("countries").EnumerateArray().Select(c => c.Str("code") + ":" + c.Str("currency"))
+            .Should().Equal("AR:ARS", "MX:MXN");
+        config.ToString().Should().NotContain("paddle", "Paddle was removed").And.NotContain(ApiFactory.MexicoAccessToken);
+        // The Paddle webhook is gone: it answers like any route that does not exist.
+        var unknown = (await anon.PostAsync("/api/v1/billing/webhooks/no-existe", new StringContent("{}"))).StatusCode;
+        (await anon.PostAsync("/api/v1/billing/webhooks/paddle", new StringContent("{}"))).StatusCode.Should().Be(unknown).And.NotBe(HttpStatusCode.OK);
     }
 
     private async Task EndTrialAsync(JsonElement login)
@@ -211,13 +236,5 @@ public sealed class BillingTests
         await using var cmd = new NpgsqlCommand("UPDATE subscriptions SET \"TrialEndsAtUtc\" = now() - interval '1 day' WHERE \"OrganizationId\" = @o", conn);
         cmd.Parameters.AddWithValue("o", Guid.Parse(login.GetProperty("user").Str("organizationId")));
         (await cmd.ExecuteNonQueryAsync()).Should().Be(1);
-    }
-
-    private static Task<HttpResponseMessage> PostPaddleAsync(HttpClient http, string body, string secret)
-    {
-        var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-        var req = new HttpRequestMessage(HttpMethod.Post, "/api/v1/billing/webhooks/paddle") { Content = new StringContent(body, Encoding.UTF8, "application/json") };
-        req.Headers.Add("Paddle-Signature", $"ts={ts};h1={PaddleSignature.Sign(secret, ts, body)}");
-        return http.SendAsync(req);
     }
 }

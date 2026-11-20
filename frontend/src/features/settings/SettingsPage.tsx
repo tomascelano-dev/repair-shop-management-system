@@ -7,7 +7,7 @@ import { errorMessage, fieldErrors } from '../../api/http'
 import type { NotificationChannel, ShopSettings, TaxCondition, UpdateShopSettings } from '../../api/types'
 import { Button, Card, Checkbox, ErrorState, Field, Input, Loading, PageHeader, Select, Tabs, Textarea } from '../../components/ui'
 import { CHANNEL, TAX_CONDITION } from '../../lib/labels'
-import { CURRENCIES } from '../../lib/shop'
+import { currencyOptions } from '../../lib/shop'
 import { AuditTab } from './AuditTab'
 import { IntegrationsTab } from './IntegrationsTab'
 import { TemplatesTab } from './TemplatesTab'
@@ -154,14 +154,14 @@ function SettingsEditor({ settings, section }: { settings: ShopSettings; section
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Field label="Moneda principal">
                 <Select value={v.defaultCurrency} onChange={(e) => set('defaultCurrency', e.target.value)}>
-                  {CURRENCIES.map((c) => (
+                  {currencyOptions(v.defaultCurrency, v.reportingCurrency).map((c) => (
                     <option key={c}>{c}</option>
                   ))}
                 </Select>
               </Field>
               <Field label="Moneda de reportes" hint="Todo se convierte a esta moneda.">
                 <Select value={v.reportingCurrency} onChange={(e) => set('reportingCurrency', e.target.value)}>
-                  {CURRENCIES.map((c) => (
+                  {currencyOptions(v.defaultCurrency, v.reportingCurrency).map((c) => (
                     <option key={c}>{c}</option>
                   ))}
                 </Select>

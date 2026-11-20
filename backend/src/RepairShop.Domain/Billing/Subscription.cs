@@ -17,14 +17,15 @@ public enum BillingProvider
     /// <summary>Granted by the platform owner (existing shops, partners). Never expires on its own.</summary>
     Manual = 1,
     MercadoPago = 2,
+    /// <summary>Legacy: Paddle was removed (2026-11). Kept so old rows still load; never live, never offered.</summary>
     Paddle = 3,
     /// <summary>Development and tests only: activates without charging.</summary>
     Simulated = 4
 }
 
 /// <summary>
-/// The SaaS subscription of one organization (all its branches). Starts as a free trial; a payment provider
-/// (Mercado Pago in Argentina, Paddle elsewhere) moves it to Active and keeps it up to date through webhooks.
+/// The SaaS subscription of one organization (all its branches). Starts as a free trial; Mercado Pago (the
+/// platform's account in the billing country) moves it to Active and keeps it up to date through webhooks.
 /// </summary>
 public sealed class Subscription
 {
@@ -38,7 +39,7 @@ public sealed class Subscription
     public SubscriptionStatus Status { get; private set; }
     public BillingProvider Provider { get; private set; }
 
-    /// <summary>ISO 3166-1 alpha-2 country used to pick the provider and currency (AR => Mercado Pago in ARS).</summary>
+    /// <summary>ISO 3166-1 alpha-2 country: picks the Mercado Pago account and the currency (AR => ARS, MX => MXN...).</summary>
     public string BillingCountry { get; private set; } = "AR";
 
     public string? ProviderSubscriptionId { get; private set; }
@@ -118,12 +119,15 @@ public sealed class Subscription
 
     /// <summary>True while a paid subscription is running at the provider (plan changes and cancellations go through it).</summary>
     public bool HasLiveProviderSubscription
-        => Provider is BillingProvider.MercadoPago or BillingProvider.Paddle
+        => Provider is BillingProvider.MercadoPago
            && ProviderSubscriptionId is not null
            && Status is SubscriptionStatus.Active or SubscriptionStatus.PastDue;
 
     public void SetBillingCountry(string country, DateTime nowUtc)
     {
+        // A running subscription is charged by the old country's Mercado Pago account: cancel it first.
+        if (HasLiveProviderSubscription && !string.Equals(NormalizeCountry(country), BillingCountry, StringComparison.Ordinal))
+            throw new DomainException("Cancelá la suscripción paga antes de cambiar el país de facturación.");
         BillingCountry = NormalizeCountry(country);
         UpdatedAtUtc = nowUtc;
     }

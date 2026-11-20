@@ -8,7 +8,7 @@ import { Alert, Badge, Button, Card, Checkbox, ConfirmDialog, EmptyState, ErrorS
 import { date, dateTime, money, parseAmount, todayIso } from '../../lib/format'
 import { useDebounced } from '../../lib/hooks'
 import { PURCHASE_STATUS } from '../../lib/labels'
-import { CURRENCIES, useDefaultCurrency } from '../../lib/shop'
+import { currencyOptions, useDefaultCurrency } from '../../lib/shop'
 import { ItemPicker } from './ItemPicker'
 
 const TAKE = 25
@@ -198,7 +198,7 @@ function PurchaseOrderEditor({ order, onClose }: { order: PurchaseOrder | null; 
           </Field>
           <Field label="Moneda">
             <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
-              {CURRENCIES.map((c) => (
+              {currencyOptions(defaultCurrency, currency).map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </Select>

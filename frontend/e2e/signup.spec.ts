@@ -32,7 +32,7 @@ test('a new shop signs up, gets the trial and picks a plan', async ({ page }) =>
   await expect(page.getByText(/Prueba gratis: te quedan/)).toHaveCount(0)
 })
 
-// Paddle reviews the domain before approving the account: it must show the product and prices and link these pages.
+// The bare domain must show the product and prices and link the legal pages (Mercado Pago and consumer law ask for them).
 test('the bare domain shows the landing page, which links terms, privacy and refund policy', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Más reparaciones. Menos papeleo.' })).toBeVisible()

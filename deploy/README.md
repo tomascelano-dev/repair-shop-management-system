@@ -124,18 +124,17 @@ Después de cambiar `.env`: `docker compose up -d`.
 
 Cualquier taller puede crear su cuenta en `/registro` y usar todo gratis durante `TRIAL_DAYS` días, sin tarjeta. Al terminar la prueba, la cuenta queda en modo consulta hasta que elija un plan en **Suscripción**. Los precios públicos están en `/precios`.
 
-- **Argentina** paga en pesos con **Mercado Pago** (suscripción mensual). Usa tu cuenta de Mercado Pago, no la de un taller.
-  1. En https://www.mercadopago.com.ar/developers → Tus integraciones → tu aplicación → Credenciales de producción: copiá el *Access token* a `MP_BILLING_ACCESS_TOKEN`.
-  2. En Webhooks → Configurar notificaciones: URL `https://app.techxto.ar/api/v1/billing/webhooks/mercadopago`, eventos **Planes y suscripciones**. Copiá la clave secreta a `MP_BILLING_WEBHOOK_SECRET`.
-- **Resto del mundo** paga en dólares con **Paddle**, que cobra como revendedor (merchant of record): agrega los impuestos de cada país y te liquida el neto. Vos le emitís una factura E por cada liquidación.
-  1. Creá la cuenta en https://www.paddle.com y completá la verificación del negocio (empezá en sandbox: https://sandbox-vendors.paddle.com).
-  2. Catálogo → Productos: un producto "RepairShop" con tres precios mensuales en USD (Básico, Estándar, Profesional). Copiá los ids `pri_...` a `PADDLE_PRICE_BASIC`, `PADDLE_PRICE_STANDARD` y `PADDLE_PRICE_PRO`, y que los montos coincidan con `PRICE_USD_*`.
-  3. Checkout → Configuración: *Default payment link* = `https://app.techxto.ar/billing` (y aprobá el dominio `app.techxto.ar`).
-  4. Developer tools → Authentication: una *API key* (`PADDLE_API_KEY`) y un *client-side token* (`PADDLE_CLIENT_TOKEN`).
-  5. Developer tools → Notifications: destino `https://app.techxto.ar/api/v1/billing/webhooks/paddle` con los eventos `subscription.*`. Copiá la *secret key* a `PADDLE_WEBHOOK_SECRET`.
-  6. Cuando pruebes un pago en sandbox y veas el plan activo, cambiá a las credenciales de producción y `PADDLE_ENVIRONMENT=production`.
-- Antes de pedir la aprobación de Paddle, completá `CONTACT_EMAIL` (email de soporte) y `LEGAL_NAME` (tu nombre o el de tu empresa): aparecen en Términos, Privacidad y en la política de reembolsos (`/reembolsos`), que Paddle revisa. Después de cambiarlos, `docker compose up -d` (los usan la API y el contenedor `web`).
-- Con un medio de cobro listo, abrí el alta: `SIGNUP_ENABLED=true` y `docker compose up -d`.
+El cobro es **solo con Mercado Pago** (suscripción mensual con débito automático, "suscripciones sin plan asociado"). No hay Paddle ni cobro en dólares. Mercado Pago tiene una cuenta por país, así que **cada país se habilita con la cuenta de la plataforma en ese país**: solo los países con cuenta completa aparecen en el registro y en `/precios`, y el alta rechaza a los demás.
+
+- **Argentina** (pesos). Usá tu cuenta de Mercado Pago de la plataforma, no la de un taller.
+  1. En https://www.mercadopago.com.ar/developers → Tus integraciones → tu aplicación → Credenciales de producción: copiá el *Access token* (`APP_USR-...`) a `MP_BILLING_ACCESS_TOKEN`.
+  2. En Webhooks → Configurar notificaciones (modo productivo): URL `https://app.techxto.ar/api/v1/billing/webhooks/mercadopago`, eventos **Planes y suscripciones**. Copiá la clave secreta a `MP_BILLING_WEBHOOK_SECRET`.
+  3. Revisá los precios finales `PRICE_ARS_*`.
+- **Brasil, Chile, Colombia, México, Perú y Uruguay** (opcional): lo mismo con la cuenta de Mercado Pago de ese país, en `MP_BILLING_<PAÍS>_ACCESS_TOKEN`, `MP_BILLING_<PAÍS>_WEBHOOK_SECRET` y `PRICE_<MONEDA>_*` (ver `.env.example`). La URL del webhook lleva el código del país: `https://app.techxto.ar/api/v1/billing/webhooks/mercadopago/mx`. Al arrancar, la API escribe en el log qué países quedaron habilitados (`docker compose logs api | grep Billing`).
+- Completá `CONTACT_EMAIL` (email de soporte) y `LEGAL_NAME` (tu nombre o el de tu empresa): aparecen en Términos, Privacidad y la política de reembolsos (`/reembolsos`). Después de cambiarlos, `docker compose up -d` (los usan la API y el contenedor `web`).
+- Con la cuenta de al menos un país lista, abrí el alta: `SIGNUP_ENABLED=true` y `docker compose up -d`.
+- **Probá un pago real** antes de anunciar: alta con un email tuyo → Suscripción → elegir plan → pagar en Mercado Pago → volver a `/billing` y ver el plan **Activo** en unos segundos. Después cancelalo desde la app y devolvete el cobro desde Mercado Pago. Ojo: Mercado Pago puede exigir que quien paga esté logueado con el mismo email con el que se registró el taller.
+- `Billing:AllowSimulated` (activar planes sin cobrar) solo existe para desarrollo: en Production la API no arranca si está en `true`.
 
 Los talleres que ya existían antes de esta versión tienen el plan Profesional bonificado. Para bonificar otro:
 
@@ -188,7 +187,7 @@ Para consultar el origen de las altas:
 docker compose exec api dotnet RepairShop.Api.dll admin signups
 ```
 
-Antes de activar campañas, probar aceptar/rechazar cookies, un alta y un pago en sandbox con las herramientas
+Antes de activar campañas, probar aceptar/rechazar cookies, un alta y un pago real de Mercado Pago (después reintegrado) con las herramientas
 de depuración de Google y Meta. El alta pública continúa controlada por `SIGNUP_ENABLED`; mantenerla en `false`
 hasta completar la configuración de cobros.
 

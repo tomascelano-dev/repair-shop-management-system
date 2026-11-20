@@ -5,7 +5,7 @@ import { authApi, billingApi } from '../../api/endpoints'
 import { errorMessage, fieldErrors } from '../../api/http'
 import { useSession } from '../../auth/session'
 import { Alert, Button, Checkbox, Field, Input, Loading, Select } from '../../components/ui'
-import { billingCountry, browserTimeZone, COUNTRIES, detectCountry } from '../../lib/billing'
+import { browserTimeZone, detectCountry, offeredCountries } from '../../lib/billing'
 import { AuthCard } from '../auth/AuthPages'
 import { countryName, publicPath, usePublicLocale } from '../../lib/publicLocale'
 import { configureTracking, signupAttribution, trackTrial } from '../../lib/marketing'
@@ -17,7 +17,10 @@ export function SignupPage() {
   const { state, acceptSession } = useSession()
   const navigate = useNavigate()
   const config = useQuery({ queryKey: ['billing-config'], queryFn: billingApi.config, staleTime: 5 * 60_000 })
-  const [form, setForm] = useState({ shopName: '', ownerName: '', email: '', password: '', country: detectCountry(), acceptTerms: false })
+  const [form, setForm] = useState({ shopName: '', ownerName: '', email: '', password: '', country: '', acceptTerms: false })
+  // Only countries where Mercado Pago charges the subscription (the API's list); the browser language picks the default.
+  const offered = offeredCountries(config.data)
+  const country = offered.includes(form.country) ? form.country : detectCountry(offered)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -38,7 +41,7 @@ export function SignupPage() {
         ownerName: form.ownerName.trim(),
         email: form.email.trim(),
         password: form.password,
-        country: billingCountry(form.country),
+        country,
         timeZone: browserTimeZone(),
         acceptTerms: form.acceptTerms,
         attribution,
@@ -86,11 +89,15 @@ export function SignupPage() {
         <Field label={en ? "Password" : "Contraseña"} hint={en ? "At least 8 characters, including letters and numbers." : "Mínimo 8 caracteres, con letras y números."} error={errors.password}>
           <Input type="password" value={form.password} onChange={(e) => set('password', e.target.value)} autoComplete="new-password" required />
         </Field>
-        <Field label={en ? "Country" : "País"} error={errors.country}>
-          <Select value={form.country} onChange={(e) => set('country', e.target.value)}>
-            {COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {countryName(c.code, locale)}
+        <Field
+          label={en ? "Country" : "País"}
+          error={errors.country}
+          hint={en ? 'For now RepairShop is available in these countries only.' : 'Por ahora RepairShop está disponible solo en estos países.'}
+        >
+          <Select value={country} onChange={(e) => set('country', e.target.value)}>
+            {offered.map((c) => (
+              <option key={c} value={c}>
+                {countryName(c, locale)}
               </option>
             ))}
           </Select>
