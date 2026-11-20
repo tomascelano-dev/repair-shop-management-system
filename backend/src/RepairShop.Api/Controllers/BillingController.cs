@@ -57,6 +57,16 @@ public sealed class BillingController : ControllerBase
             VisitorCountry())));
     }
 
+    /// <summary>
+    /// "Botón de arrepentimiento" (Res. 424/2020): anyone can withdraw from the contract without signing in and
+    /// gets an identification code right away.
+    /// </summary>
+    [HttpPost("withdrawal")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimits.Auth)]
+    public async Task<ActionResult<ApiResponse<WithdrawalResponse>>> Withdrawal([FromBody] WithdrawalRequestBody body, [FromServices] WithdrawalService withdrawals, CancellationToken ct)
+        => Ok(Envelope.Ok(await withdrawals.RequestAsync(body, HttpContext.Connection.RemoteIpAddress?.ToString(), ct)));
+
     [HttpGet("subscription")]
     public async Task<ActionResult<ApiResponse<SubscriptionResponse>>> Get(CancellationToken ct)
         => Ok(Envelope.Ok(await _subscriptions.GetAsync(CurrentUser.GetOrganizationId(User), CurrentUser.GetUserId(User), ct)));

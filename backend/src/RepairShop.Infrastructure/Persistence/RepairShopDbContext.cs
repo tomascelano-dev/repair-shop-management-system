@@ -58,6 +58,7 @@ public sealed class RepairShopDbContext : DbContext, IDataProtectionKeyContext
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<SignupAttribution> SignupAttributions => Set<SignupAttribution>();
     public DbSet<AdConversion> AdConversions => Set<AdConversion>();
+    public DbSet<WithdrawalRequest> WithdrawalRequests => Set<WithdrawalRequest>();
 
     // CRM
     public DbSet<Customer> Customers => Set<Customer>();

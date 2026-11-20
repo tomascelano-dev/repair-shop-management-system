@@ -95,7 +95,33 @@ docker compose exec backup restore.sh /backups/db-AAAAMMDD-HHMMSS.dump
 docker compose start api
 ```
 
-Copia fuera del servidor: configurá un remoto en `backup/rclone.conf` (hay un ejemplo para Cloudflare R2) y poné `RCLONE_REMOTE` en `.env`. Hasta entonces, las copias viven en el mismo servidor.
+### Copia fuera del servidor (Cloudflare R2, cifrada)
+
+Las copias locales viven en el mismo disco que la base: si se pierde el servidor, se pierden con él. La copia diaria a R2 va **cifrada** (rclone crypt): R2 nunca ve los datos de los clientes de los talleres.
+
+1. En Cloudflare → R2: creá un bucket `repairshop-backups`. En *Manage R2 API Tokens*, creá un token con permiso **Object Read & Write** solo para ese bucket. Anotá el *Access Key ID*, el *Secret Access Key* y tu *Account ID*.
+2. En el servidor, desde `deploy/`:
+
+   ```bash
+   docker compose build backup
+   docker compose run --rm backup setup-r2.sh
+   ```
+
+   Te pide esos datos (el secreto no se ve al escribir), prueba una escritura cifrada y muestra **dos claves de cifrado: guardalas en tu gestor de contraseñas**. Sin ellas las copias de R2 no se pueden leer. Las credenciales quedan en `backup/rclone/rclone.conf`, que no se versiona.
+3. En `.env`: `RCLONE_REMOTE=r2crypt:` y `docker compose up -d`.
+4. Probalo: `docker compose exec backup backup.sh` tiene que terminar con `Copia fuera del servidor ... OK`.
+
+R2 guarda 30 días (`OFFSITE_KEEP_DAYS`). Si la subida falla, la copia local igual queda y el log dice `ERROR: la copia fuera del servidor ... falló` (`docker compose logs backup`).
+
+Restaurar desde R2 (por ejemplo, en un servidor nuevo con el mismo `rclone.conf`):
+
+```bash
+docker compose exec backup rclone ls r2crypt:                       # ver las copias
+docker compose exec backup rclone copy r2crypt: /backups --include "db-AAAAMMDD-HHMMSS.dump"
+docker compose stop api && docker compose exec backup restore.sh /backups/db-AAAAMMDD-HHMMSS.dump && docker compose start api
+```
+
+Si se perdió todo el servidor, rearmá `backup/rclone/rclone.conf` con el token de R2 y las dos claves del gestor de contraseñas (`rclone obscure <clave>` para cada `password`).
 
 ## 4. Pasar al dominio definitivo
 
@@ -135,6 +161,7 @@ El cobro es **solo con Mercado Pago** (suscripción mensual con débito automát
 - Con la cuenta de al menos un país lista, abrí el alta: `SIGNUP_ENABLED=true` y `docker compose up -d`.
 - **Probá un pago real** antes de anunciar: alta con un email tuyo → Suscripción → elegir plan → pagar en Mercado Pago → volver a `/billing` y ver el plan **Activo** en unos segundos. Después cancelalo desde la app y devolvete el cobro desde Mercado Pago. Ojo: Mercado Pago puede exigir que quien paga esté logueado con el mismo email con el que se registró el taller.
 - `Billing:AllowSimulated` (activar planes sin cobrar) solo existe para desarrollo: en Production la API no arranca si está en `true`.
+- **Botón de arrepentimiento** (Res. 424/2020, Argentina): está en el pie de todas las páginas públicas y en Suscripción (`/arrepentimiento`). Cualquiera lo usa sin iniciar sesión y recibe un código `ARR-...` en el momento; si el email es de una cuenta, también por email. A `CONTACT_EMAIL` llega un aviso con los datos de la suscripción: **cancelala y reintegrá el pago a mano** (Mercado Pago → la suscripción / el pago → devolver). Si un aviso no llegó: `docker compose exec api dotnet RepairShop.Api.dll admin arrepentimientos`.
 
 Los talleres que ya existían antes de esta versión tienen el plan Profesional bonificado. Para bonificar otro:
 

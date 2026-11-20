@@ -12,24 +12,46 @@ namespace RepairShop.Api.Common;
 ///   dotnet RepairShop.Api.dll admin create &lt;email&gt; ["Nombre"] ["Nombre del taller"]
 ///   dotnet RepairShop.Api.dll admin plan &lt;email&gt; &lt;Basic|Standard|Pro&gt;
 ///   dotnet RepairShop.Api.dll admin signups [días]
+///   dotnet RepairShop.Api.dll admin arrepentimientos [días]
 /// A new email becomes an administrator (the first run also creates the shop); an existing email gets a fresh
 /// link to set its password. Prints a one-time link: the password is chosen in the browser, never on the server.
 /// </summary>
 internal static class AdminCommand
 {
-    private const string Usage = "Uso: admin create <email> [\"Nombre\"] [\"Nombre del taller\"]\n     admin plan <email> <Basic|Standard|Pro>\n     admin signups [días]";
+    private const string Usage = "Uso: admin create <email> [\"Nombre\"] [\"Nombre del taller\"]\n     admin plan <email> <Basic|Standard|Pro>\n     admin signups [días]\n     admin arrepentimientos [días]";
 
     public static bool Matches(string[] args)
         => args.Length >= 2
            && string.Equals(args[0], "admin", StringComparison.OrdinalIgnoreCase)
-           && args[1].ToLowerInvariant() is "create" or "plan" or "signups";
+           && args[1].ToLowerInvariant() is "create" or "plan" or "signups" or "arrepentimientos";
 
     public static Task<int> RunAsync(WebApplication app, string[] args) => args[1].ToLowerInvariant() switch
     {
         "plan" => GrantPlanAsync(app, args),
         "signups" => ListSignupsAsync(app, args),
+        "arrepentimientos" => ListWithdrawalsAsync(app, args),
         _ => CreateAsync(app, args)
     };
+
+    /// <summary>Withdrawal requests ("botón de arrepentimiento") of the last days, in case a notice email was lost.</summary>
+    private static async Task<int> ListWithdrawalsAsync(WebApplication app, string[] args)
+    {
+        var days = int.TryParse(args.ElementAtOrDefault(2), out var d) && d > 0 ? d : 90;
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RepairShopDbContext>();
+        var since = scope.ServiceProvider.GetRequiredService<IDateTimeProvider>().UtcNow.AddDays(-days);
+
+        var requests = await db.WithdrawalRequests.Where(x => x.CreatedAtUtc >= since).OrderByDescending(x => x.CreatedAtUtc).ToListAsync();
+        var orgs = requests.Where(x => x.OrganizationId != null).Select(x => x.OrganizationId!.Value).ToList();
+        var shops = await db.Shops.Where(x => orgs.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name);
+
+        Console.WriteLine($"Solicitudes de arrepentimiento de los últimos {days} días: {requests.Count}");
+        Console.WriteLine(string.Join('\t', "fecha", "código", "email", "nombre", "taller", "motivo"));
+        foreach (var x in requests)
+            Console.WriteLine(string.Join('\t', x.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm"), x.Code, x.Email, x.Name,
+                x.OrganizationId is { } o ? shops.GetValueOrDefault(o, "?") : "(sin cuenta)", (x.Reason ?? "").Replace('\n', ' ')));
+        return 0;
+    }
 
     /// <summary>Recent self-service signups with their subscription and the campaign they came from (tab-separated).</summary>
     private static async Task<int> ListSignupsAsync(WebApplication app, string[] args)

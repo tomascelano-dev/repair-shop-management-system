@@ -76,6 +76,30 @@ public sealed class BillingTests
     }
 
     [IntegrationFact]
+    public async Task Anyone_can_withdraw_without_signing_in_and_gets_an_identification_code()
+    {
+        var email = $"arr{Guid.NewGuid():N}"[..20] + "@example.com";
+        var (_, login) = await ApiClient.SignupAsync(_factory, "AR", email);
+        var anon = _factory.CreateClient();
+
+        var res = await anon.PostAsJsonAsync("/api/v1/billing/withdrawal", new { email = email.ToUpperInvariant(), name = "Dueña Test", reason = "Me arrepentí" });
+        var data = await res.DataAsync();
+        data.Str("code").Should().MatchRegex("^ARR-[A-Z2-9]{8}$");
+
+        await using var conn = new NpgsqlConnection(_factory.ConnectionString);
+        await conn.OpenAsync();
+        await using var cmd = new NpgsqlCommand("SELECT \"OrganizationId\" FROM withdrawal_requests WHERE \"Code\" = @c", conn);
+        cmd.Parameters.AddWithValue("c", data.Str("code"));
+        (await cmd.ExecuteScalarAsync()).Should().Be(Guid.Parse(login.GetProperty("user").Str("organizationId")), "it is linked to the account");
+
+        // Without an account it is still recorded (and answered with a code), and the fields are validated.
+        (await (await anon.PostAsJsonAsync("/api/v1/billing/withdrawal", new { email = "nadie@example.com", name = "Alguien" })).DataAsync())
+            .Str("code").Should().StartWith("ARR-");
+        (await anon.PostAsJsonAsync("/api/v1/billing/withdrawal", new { email = "sin-arroba", name = "Alguien" })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await anon.PostAsJsonAsync("/api/v1/billing/withdrawal", new { email = "x@example.com", name = "" })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [IntegrationFact]
     public async Task The_emailed_link_verifies_the_address()
     {
         var email = $"verify{Guid.NewGuid():N}"[..20] + "@example.com";

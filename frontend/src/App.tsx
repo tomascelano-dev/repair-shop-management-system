@@ -40,6 +40,7 @@ const PricingPage = page(() => import('./features/public/PricingPage'), 'Pricing
 const TermsPage = page(() => import('./features/public/LegalPages'), 'TermsPage')
 const PrivacyPage = page(() => import('./features/public/LegalPages'), 'PrivacyPage')
 const RefundPage = page(() => import('./features/public/LegalPages'), 'RefundPage')
+const WithdrawalPage = page(() => import('./features/public/WithdrawalPage'), 'WithdrawalPage')
 
 function Guard({ permission, children }: { permission: Permission; children: ReactNode }) {
   return <RequirePermission permission={permission}>{children}</RequirePermission>
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="/en/terms" element={<TermsPage />} />
         <Route path="/en/privacy" element={<PrivacyPage />} />
         <Route path="/en/refunds" element={<RefundPage />} />
+        <Route path="/en/withdrawal" element={<WithdrawalPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/olvide" element={<ForgotPasswordPage />} />
         <Route path="/restablecer" element={<ResetPasswordPage />} />
@@ -69,6 +71,7 @@ export default function App() {
         <Route path="/terminos" element={<TermsPage />} />
         <Route path="/privacidad" element={<PrivacyPage />} />
         <Route path="/reembolsos" element={<RefundPage />} />
+        <Route path="/arrepentimiento" element={<WithdrawalPage />} />
 
         <Route
           element={

@@ -47,4 +47,11 @@ test('the bare domain shows the landing page, which links terms, privacy and ref
   }
   await expect(page.getByText(/dentro de los 14 días corridos/)).toBeVisible()
   await page.screenshot({ path: 'test-results/reembolsos.png', fullPage: true })
+
+  // Botón de arrepentimiento (Res. 424/2020): reachable from every public page, works without signing in.
+  await footer.getByRole('link', { name: 'Botón de arrepentimiento' }).click()
+  await page.getByLabel('Email de tu cuenta').fill('nadie@example.com')
+  await page.getByLabel('Nombre y apellido').fill('Persona E2E')
+  await page.getByRole('button', { name: 'Arrepentirme de la contratación' }).click()
+  await expect(page.getByText(/ARR-[A-Z2-9]{8}/)).toBeVisible()
 })

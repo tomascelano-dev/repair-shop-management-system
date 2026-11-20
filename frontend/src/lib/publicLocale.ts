@@ -1,11 +1,11 @@
 import { useLocation } from 'react-router-dom'
 
 export type PublicLocale = 'es' | 'en'
-export type PublicSection = 'home' | 'pricing' | 'signup' | 'terms' | 'privacy' | 'refunds'
+export type PublicSection = 'home' | 'pricing' | 'signup' | 'terms' | 'privacy' | 'refunds' | 'withdrawal'
 
 const paths: Record<PublicLocale, Record<PublicSection, string>> = {
-  es: { home: '/', pricing: '/precios', signup: '/registro', terms: '/terminos', privacy: '/privacidad', refunds: '/reembolsos' },
-  en: { home: '/en', pricing: '/en/pricing', signup: '/en/signup', terms: '/en/terms', privacy: '/en/privacy', refunds: '/en/refunds' },
+  es: { home: '/', pricing: '/precios', signup: '/registro', terms: '/terminos', privacy: '/privacidad', refunds: '/reembolsos', withdrawal: '/arrepentimiento' },
+  en: { home: '/en', pricing: '/en/pricing', signup: '/en/signup', terms: '/en/terms', privacy: '/en/privacy', refunds: '/en/refunds', withdrawal: '/en/withdrawal' },
 }
 
 export function publicLocale(path: string): PublicLocale {

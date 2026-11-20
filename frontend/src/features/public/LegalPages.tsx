@@ -177,8 +177,12 @@ export function RefundPage() {
       <p>Si te cobramos dos veces el mismo período, o después de que cancelaste, te devolvemos el importe completo.</p>
       <h2>4. Cómo pedirlo</h2>
       <p>
-        Escríbenos por <Contact /> desde el email de tu cuenta. El pago lo procesa Mercado Pago y el reintegro se hace por el mismo medio. En Argentina
-        también puedes ejercer el derecho de arrepentimiento dentro de los 10 días de la contratación, por el mismo canal.
+        Escríbenos por <Contact /> desde el email de tu cuenta. El pago lo procesa Mercado Pago y el reintegro se hace por el mismo medio. También
+        puedes revocar la contratación dentro de los 10 días con el{' '}
+        <Link to={publicPath('es', 'withdrawal')} className="text-brand-700 underline">
+          botón de arrepentimiento
+        </Link>
+        , sin iniciar sesión: te damos un código de identificación en el momento.
       </p>
       <h2>5. Plazos</h2>
       <p>
@@ -237,7 +241,7 @@ function EnglishLegalPage({ page }: { page: 'terms' | 'privacy' | 'refund' }) {
       <h2>3. Incorrect charges</h2>
       <p>If you are charged twice for the same period or after cancellation has taken effect, we refund the full incorrect charge.</p>
       <h2>4. How to request a refund</h2>
-      <p>Contact <Contact /> using your account email. Mercado Pago processes payments, and refunds go back through it. In Argentina, you may also exercise your right to withdraw within 10 days of contracting.</p>
+      <p>Contact <Contact /> using your account email. Mercado Pago processes payments, and refunds go back through it. You may also withdraw within 10 days of contracting with the <Link to={publicPath('en', 'withdrawal')} className="text-brand-700 underline">withdrawal button</Link>, without signing in: you get an identification code right away.</p>
       <h2>5. Timing</h2>
       <p>We respond within five business days. After approval, funds return to the original payment method according to your bank or card provider’s processing times.</p>
     </LegalPage>

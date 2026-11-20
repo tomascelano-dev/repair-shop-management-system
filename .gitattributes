@@ -1,0 +1,3 @@
+# Scripts que corren en Linux (contenedores, servidor): siempre LF.
+*.sh text eol=lf
+

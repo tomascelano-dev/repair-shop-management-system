@@ -76,6 +76,32 @@ internal sealed class AdConversionConfiguration : IEntityTypeConfiguration<AdCon
     }
 }
 
+internal sealed class WithdrawalRequestConfiguration : IEntityTypeConfiguration<WithdrawalRequest>
+{
+    public void Configure(EntityTypeBuilder<WithdrawalRequest> b)
+    {
+        b.ToTable("withdrawal_requests");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(16).IsRequired();
+        b.HasIndex(x => x.Code).IsUnique();
+        b.Property(x => x.Email).HasMaxLength(180).IsRequired();
+        b.Property(x => x.Name).HasMaxLength(120).IsRequired();
+        b.Property(x => x.Reason).HasMaxLength(1000);
+        b.Property(x => x.ClientIp).HasMaxLength(64);
+        b.Property(x => x.CreatedAtUtc).IsRequired();
+        b.HasIndex(x => x.CreatedAtUtc);
+    }
+}
+
+internal sealed class WithdrawalRepository : RepairShop.Application.Billing.IWithdrawalRepository
+{
+    private readonly RepairShopDbContext _db;
+
+    public WithdrawalRepository(RepairShopDbContext db) => _db = db;
+
+    public async Task AddAsync(WithdrawalRequest request, CancellationToken ct) => await _db.WithdrawalRequests.AddAsync(request, ct);
+}
+
 internal sealed class AdTrackingRepository : IAdTrackingRepository
 {
     private readonly RepairShopDbContext _db;

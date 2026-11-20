@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<SubscriptionService>();
         services.AddScoped<AdConversionService>();
         services.AddScoped<SignupService>();
+        services.AddScoped<WithdrawalService>();
 
         services.AddScoped<CustomerService>();
         services.AddScoped<DeviceService>();

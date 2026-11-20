@@ -13,6 +13,7 @@ export function AuthCard({ title, subtitle, children }: { title: string; subtitl
   const legalLinks = locale === 'en' ? [
     { to: publicPath(locale, 'pricing'), label: 'Pricing' }, { to: publicPath(locale, 'terms'), label: 'Terms' },
     { to: publicPath(locale, 'privacy'), label: 'Privacy' }, { to: publicPath(locale, 'refunds'), label: 'Refunds' },
+    { to: publicPath(locale, 'withdrawal'), label: 'Withdrawal button' },
   ] : LEGAL_LINKS
   return (
     <div className="flex min-h-full flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 px-4 py-10">
@@ -45,6 +46,7 @@ const LEGAL_LINKS = [
   { to: '/terminos', label: 'Términos' },
   { to: '/privacidad', label: 'Privacidad' },
   { to: '/reembolsos', label: 'Reembolsos' },
+  { to: '/arrepentimiento', label: 'Botón de arrepentimiento' },
 ]
 
 const DEMO_USERS = [

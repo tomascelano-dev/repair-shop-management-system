@@ -33,6 +33,10 @@ export function PublicFooter() {
       {(['pricing', 'terms', 'privacy', 'refunds'] as const).map((section, i) => (
         <Link key={section} to={publicPath(locale, section)} className="hover:underline">{labels[i]}</Link>
       ))}
+      {/* Required in Argentina on the first screen (Res. 424/2020): visible, with this exact name. */}
+      <Link to={publicPath(locale, 'withdrawal')} className="font-semibold text-slate-800 underline">
+        {locale === 'en' ? 'Withdrawal button' : 'Botón de arrepentimiento'}
+      </Link>
       <button type="button" onClick={() => window.dispatchEvent(new Event(COOKIE_SETTINGS))} className="underline">
         {locale === 'en' ? 'Cookie settings' : 'Preferencias de cookies'}
       </button>

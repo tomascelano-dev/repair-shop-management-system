@@ -1184,6 +1184,12 @@ export interface BillingConfig {
   visitorCountry?: string | null
 }
 
+/** "Botón de arrepentimiento": identification code given right away. */
+export interface WithdrawalResult {
+  code: string
+  createdAtUtc: IsoDate
+}
+
 export interface BillingCountry {
   code: string
   currency: string

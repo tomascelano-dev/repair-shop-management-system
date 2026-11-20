@@ -1,0 +1,3 @@
+# Credenciales de R2 y clave de cifrado de los backups (las escribe setup-r2.sh). Nunca se versionan.
+*
+!.gitignore

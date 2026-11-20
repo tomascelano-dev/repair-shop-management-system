@@ -87,6 +87,7 @@ public static class DependencyInjection
         services.AddScoped<IStoredFileRepository, StoredFileRepository>();
         services.AddScoped<IExchangeRateRepository, ExchangeRateRepository>();
         services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+        services.AddScoped<IWithdrawalRepository, WithdrawalRepository>();
         services.AddScoped<IAdTrackingRepository, AdTrackingRepository>();
         services.AddScoped<IShopProvisioner, ShopProvisioner>();
 
@@ -218,6 +219,7 @@ public static class DependencyInjection
         services.AddSingleton<MetaWhatsAppSender>();
         services.AddSingleton<SmtpEmailSender>();
         services.AddSingleton<NotificationRouter>();
+        services.AddSingleton<IPlatformMailer, PlatformMailer>();
         services.AddSingleton<IIntegrationStatusChannels>(sp => sp.GetRequiredService<NotificationRouter>());
         services.AddScoped<NotificationDispatcher>();
     }

@@ -1,6 +1,6 @@
 import { configureTracking, trackPurchase } from '../../lib/marketing'
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { billingApi } from '../../api/endpoints'
@@ -115,7 +115,10 @@ export function BillingPage() {
           </div>
           <p className="text-xs text-slate-500">
             Todos los planes incluyen: {CORE_FEATURES.join(' · ')}.{' '}
-            {s.checkoutAvailable && s.plans[0] ? `Se cobra en ${currencyName(s.plans[0].currency)} con Mercado Pago, con débito automático cada mes.` : null}
+            {s.checkoutAvailable && s.plans[0] ? `Se cobra en ${currencyName(s.plans[0].currency)} con Mercado Pago, con débito automático cada mes. ` : null}
+            <Link to="/arrepentimiento" className="underline">
+              Botón de arrepentimiento
+            </Link>
           </p>
         </>
       )}
