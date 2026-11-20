@@ -36,6 +36,26 @@ public static class MercadoPagoSignature
         return CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(expected), Encoding.ASCII.GetBytes(v1.ToLowerInvariant()));
     }
 
+    /// <summary>Shape of an x-signature header for diagnostics: which parts it has and how old its timestamp is (seconds).</summary>
+    public static (bool HasTs, bool HasV1, long? AgeSeconds) Describe(string? signatureHeader, DateTime nowUtc)
+    {
+        string? ts = null, v1 = null;
+        foreach (var part in (signatureHeader ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var kv = part.Split('=', 2);
+            if (kv.Length != 2) continue;
+            if (kv[0] == "ts") ts = kv[1];
+            else if (kv[0] == "v1") v1 = kv[1];
+        }
+        long? age = null;
+        if (long.TryParse(ts, out var t))
+        {
+            var when = t > 10_000_000_000 ? DateTimeOffset.FromUnixTimeMilliseconds(t) : DateTimeOffset.FromUnixTimeSeconds(t);
+            age = (long)(nowUtc - when.UtcDateTime).TotalSeconds;
+        }
+        return (ts is not null, v1 is not null, age);
+    }
+
     public static string Sign(string secret, string requestId, string dataId, string ts)
     {
         var manifest = $"id:{dataId.ToLowerInvariant()};request-id:{requestId};ts:{ts};";

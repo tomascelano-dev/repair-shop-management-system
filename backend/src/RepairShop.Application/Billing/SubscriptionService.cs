@@ -191,7 +191,11 @@ public sealed class SubscriptionService
         if (account is null || !_gateway.IsConfigured(country)) return WebhookOutcome.Rejected;
         if (!MercadoPagoSignature.IsValid(account.WebhookSecret, n.Signature, n.RequestId, n.DataId, _clock.UtcNow, TimeSpan.FromMinutes(15)))
         {
-            _logger.LogWarning("Rejected Mercado Pago subscription webhook for {Country} with an invalid signature.", country);
+            // Enough to tell a wrong secret from a missing header or a stale timestamp, without logging the signature.
+            var (hasTs, hasV1, ageSeconds) = MercadoPagoSignature.Describe(n.Signature, _clock.UtcNow);
+            _logger.LogWarning("Rejected Mercado Pago subscription webhook for {Country} with an invalid signature " +
+                               "(x-signature: {HasHeader}, ts: {HasTs}, v1: {HasV1}, ts age: {AgeSeconds}s, x-request-id: {HasRequestId}, type: {Type}, data.id: {DataId}).",
+                country, !string.IsNullOrWhiteSpace(n.Signature), hasTs, hasV1, ageSeconds, !string.IsNullOrWhiteSpace(n.RequestId), n.Type, n.DataId);
             return WebhookOutcome.Rejected;
         }
 
