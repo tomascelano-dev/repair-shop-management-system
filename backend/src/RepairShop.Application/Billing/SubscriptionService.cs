@@ -293,9 +293,13 @@ public sealed class SubscriptionService
             AdConversionService.PurchaseEventId(sub));
     }
 
-    /// <summary>Plan with its price in the country's currency (no price where RepairShop is not sold).</summary>
+    /// <summary>
+    /// Plan with its configured price in the country's currency; no price outside Mercado Pago countries. Whether the
+    /// shop can pay right now is a separate flag (checkoutAvailable), so the public prices show before the account is set up.
+    /// </summary>
     private PlanResponse ToResponse(PlanDefinition p, string country)
-        => new(p.Id.ToString(), p.Name, p.MaxBranches, p.Modules, _options.IsOffered(country) ? _options.PriceFor(p.Id, country) : null, CurrencyFor(country));
+        => new(p.Id.ToString(), p.Name, p.MaxBranches, p.Modules,
+            MercadoPagoCountries.IsSupported(country) ? _options.PriceFor(p.Id, country) : null, CurrencyFor(country));
 
     private async Task AuditAsync(Guid organizationId, string action, Actor actor, object data, CancellationToken ct)
     {

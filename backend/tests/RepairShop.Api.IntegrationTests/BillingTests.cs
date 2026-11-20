@@ -212,6 +212,9 @@ public sealed class BillingTests
         mx.Str("currency").Should().Be("MXN");
         mx.GetProperty("plans")[0].Dec("price").Should().Be(449m);
 
+        // Argentina has prices but no Mercado Pago account in tests: the public price list still shows them.
+        ar.GetProperty("plans")[0].Dec("price").Should().Be(29900m);
+
         foreach (var other in new[] { "", "?country=US", "?country=xyz" })
         {
             var fallback = await (await anon.GetAsync("/api/v1/billing/plans" + other)).DataAsync();
