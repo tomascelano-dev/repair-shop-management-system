@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { billingApi } from '../../api/endpoints'
 import { publicPath, usePublicLocale } from '../../lib/publicLocale'
+import { SEO_TITLES } from '../../lib/seo'
 import { PublicLayout } from './PublicLayout'
 
 /** What the product does, in the words shops search with ("órdenes de reparación", "stock de repuestos"...). */
@@ -55,7 +56,7 @@ export function LandingPage() {
     ['Inventario y cobros juntos', 'Gestiona repuestos, ventas y caja. Añade compras, informes y sucursales a medida que crece tu negocio.'],
   ]
   return (
-    <PublicLayout title={en ? 'Repair shop management' : 'Gestión de talleres de reparación'}>
+    <PublicLayout title={en ? 'Repair shop management' : 'Gestión de talleres de reparación'} documentTitle={SEO_TITLES.home[locale]}>
       <main className="mx-auto max-w-6xl px-4 pb-12">
         <section className="grid items-center gap-10 py-12 md:grid-cols-2 md:py-20">
           <div>

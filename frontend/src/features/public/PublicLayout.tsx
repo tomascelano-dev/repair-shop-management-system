@@ -44,11 +44,12 @@ export function PublicFooter() {
   )
 }
 
-export function PublicLayout({ title, children }: { title: string; children: ReactNode }) {
+/** `documentTitle` replaces the default "<title> · RepairShop" (pages with a search title, see lib/seo.ts). */
+export function PublicLayout({ title, documentTitle, children }: { title: string; documentTitle?: string; children: ReactNode }) {
   const locale = usePublicLocale()
   useEffect(() => {
     document.documentElement.lang = locale
-    document.title = `${title} · RepairShop`
-  }, [locale, title])
+    document.title = documentTitle ?? `${title} · RepairShop`
+  }, [locale, title, documentTitle])
   return <div className="min-h-full bg-slate-50"><PublicHeader />{children}<PublicFooter /></div>
 }

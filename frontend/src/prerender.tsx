@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { BillingConfig, PlansResponse } from './api/types'
 import { LandingPage } from './features/public/LandingPage'
 import { publicPath, type PublicLocale, type PublicSection } from './lib/publicLocale'
+import { SEO_TITLES } from './lib/seo'
 import { PricingPage } from './features/public/PricingPage'
 import { PrivacyPage, RefundPage, TermsPage } from './features/public/LegalPages'
 
@@ -46,7 +47,7 @@ export const PUBLIC_PAGES: PublicPage[] = (['es', 'en'] as const).flatMap((local
   const pages = [
     {
       section: 'home' as const,
-      title: en ? 'Repair shop software for phones and electronics | RepairShop' : 'Sistema para servicio técnico y taller de celulares | RepairShop',
+      title: SEO_TITLES.home[locale],
       description: en
         ? 'Repair shop management software: repair orders, estimates, online tracking for customers, parts inventory, point of sale and cash register. 14-day free trial.'
         : 'Software para servicio técnico: órdenes de reparación, presupuestos, seguimiento online para clientes, stock de repuestos, caja y factura ARCA. 14 días gratis.',
@@ -55,7 +56,7 @@ export const PUBLIC_PAGES: PublicPage[] = (['es', 'en'] as const).flatMap((local
     },
     {
       section: 'pricing' as const,
-      title: en ? 'Pricing for repair shop software | RepairShop' : 'Precios del sistema para servicio técnico | RepairShop',
+      title: SEO_TITLES.pricing[locale],
       description: en
         ? 'Monthly plans for repair shops with unlimited users. Paid in your local currency with Mercado Pago. Try it free for 14 days, no card required.'
         : 'Planes mensuales en pesos para tu servicio técnico, con usuarios ilimitados y débito automático por Mercado Pago. Prueba 14 días gratis, sin tarjeta.',

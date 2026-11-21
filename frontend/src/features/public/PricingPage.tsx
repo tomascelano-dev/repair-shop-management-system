@@ -7,6 +7,7 @@ import { Alert, Loading, Select } from '../../components/ui'
 import { currencyName, detectCountry, offeredCountries, planPrice } from '../../lib/billing'
 import { countryName, publicPath, usePublicLocale } from '../../lib/publicLocale'
 import { cn } from '../../lib/cn'
+import { SEO_TITLES } from '../../lib/seo'
 import { PublicLayout } from './PublicLayout'
 
 const names = { es: { Basic: 'Básico', Standard: 'Estándar', Pro: 'Profesional' }, en: { Basic: 'Basic', Standard: 'Standard', Pro: 'Professional' } }
@@ -26,7 +27,7 @@ export function PricingPage({ initialCountry }: { initialCountry?: string } = {}
   const currency = plans.data?.currency ?? config.data?.countries.find((c) => c.code === country)?.currency ?? 'ARS'
   const features = en ? ['Orders, estimates and workshop board', 'Customer tracking and estimate approval', 'Point of sale, cash register and inventory', 'WhatsApp, email and SMS notifications', 'Unlimited users'] : ['Órdenes, presupuestos y tablero del taller', 'Seguimiento y aprobación de presupuestos para clientes', 'Punto de venta, caja e inventario', 'Avisos por WhatsApp, email y SMS', 'Usuarios ilimitados']
   return (
-    <PublicLayout title={en ? 'Pricing' : 'Precios'}>
+    <PublicLayout title={en ? 'Pricing' : 'Precios'} documentTitle={SEO_TITLES.pricing[locale]}>
       <main className="mx-auto max-w-6xl px-4 pb-10">
         <section className="py-8 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">{en ? 'A plan for every repair shop' : 'El sistema para tu servicio técnico'}</h1>
