@@ -127,6 +127,12 @@ jobs:
           check /factura-electronica-servicio-tecnico 'href="/registro"'
           check /factura-electronica-servicio-tecnico '<link rel="canonical" href="https://ci.example.com/factura-electronica-servicio-tecnico" />'
           check /sitemap.xml '<loc>https://ci.example.com/control-de-stock-de-repuestos</loc>'
+          check /plantilla-orden-de-servicio-tecnico 'Plantilla de orden de servicio técnico gratis para imprimir</h1>'
+          check /plantilla-orden-de-servicio-tecnico 'href="/plantillas/orden-de-servicio-tecnico.pdf"'
+          check /sistema-vs-excel-servicio-tecnico 'Cuaderno, Excel o sistema para servicio técnico: cuál conviene</h1>'
+          check /sistema-vs-excel-servicio-tecnico '<th scope="row"'
+          check /sitemap.xml '<loc>https://ci.example.com/plantilla-orden-de-servicio-tecnico</loc>'
+          curl -fsS -o /dev/null -w '%{content_type}\n' http://127.0.0.1:8099/plantillas/orden-de-servicio-tecnico.pdf | grep -q 'application/pdf' || { echo "the template PDF is not served"; exit 1; }
           # Search engines: sitemap and canonical URLs with the public domain; the app is never indexed.
           check /robots.txt 'Sitemap: https://ci.example.com/sitemap.xml'
           check /sitemap.xml '<loc>https://ci.example.com/precios</loc>'

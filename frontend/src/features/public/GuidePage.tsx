@@ -21,7 +21,8 @@ export function GuidePage() {
             <p className="text-sm font-semibold uppercase tracking-wide text-brand-700">{guide.eyebrow}</p>
             <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">{guide.heading}</h1>
             <p className="mt-5 text-lg leading-relaxed text-slate-600">{guide.intro}</p>
-            <CallToAction days={days} />
+            {/* A guide that opens with a free download shows it first: that is what the visitor searched for. */}
+            {guide.blocks[0]?.download ? null : <CallToAction days={days} />}
           </header>
           {guide.blocks.map((block) => (
             <section key={block.heading} className="mt-10">
@@ -31,6 +32,38 @@ export function GuidePage() {
                 <ul className="mt-3 list-disc space-y-2 pl-6 leading-relaxed text-slate-700">
                   {block.items.map((item) => <li key={item}>{item}</li>)}
                 </ul>
+              ) : null}
+              {block.table ? (
+                <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-slate-200">
+                  <table className="w-full min-w-[36rem] border-collapse bg-white text-left text-sm">
+                    <thead className="bg-slate-50 text-slate-900">
+                      <tr>{block.table.head.map((h, i) => <th key={i} scope="col" className="px-3 py-2 font-semibold">{h}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {block.table.rows.map((row) => (
+                        <tr key={row[0]} className="border-t border-slate-200 align-top">
+                          {row.map((cell, i) => i === 0
+                            ? <th key={i} scope="row" className="px-3 py-2 font-medium text-slate-900">{cell}</th>
+                            : <td key={i} className={i === row.length - 1 ? 'px-3 py-2 font-medium text-brand-700' : 'px-3 py-2 text-slate-600'}>{cell}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+              {block.download ? (
+                <div className="mt-4 grid items-center gap-6 rounded-2xl bg-white p-5 ring-1 ring-slate-200 sm:grid-cols-[14rem_1fr]">
+                  <a href={block.download.href} target="_blank" rel="noopener">
+                    <img src={block.download.preview} alt={block.download.previewAlt} width={794} height={1145} loading="lazy"
+                      className="w-full rounded-lg shadow ring-1 ring-slate-200" />
+                  </a>
+                  <div>
+                    <a href={block.download.href} download className="inline-block rounded-lg bg-brand-600 px-5 py-3 font-semibold text-white hover:bg-brand-700">
+                      {block.download.label}
+                    </a>
+                    {block.download.note ? <p className="mt-3 text-sm leading-relaxed text-slate-600">{block.download.note}</p> : null}
+                  </div>
+                </div>
               ) : null}
               {block.related ? (
                 <p className="mt-3 text-sm text-slate-600">

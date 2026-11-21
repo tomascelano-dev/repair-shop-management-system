@@ -61,7 +61,7 @@
 		@prerendered {
 			path /home.html /precios.html /terminos.html /privacidad.html /reembolsos.html /en.html /en/pricing.html /en/terms.html /en/privacy.html /en/refunds.html /sitemap.xml /robots.txt
 			# Long-tail guides (frontend/src/features/public/guides.ts).
-			path /sistema-servicio-tecnico-celulares.html /orden-de-reparacion-online.html /control-de-stock-de-repuestos.html /factura-electronica-servicio-tecnico.html
+			path /sistema-servicio-tecnico-celulares.html /orden-de-reparacion-online.html /control-de-stock-de-repuestos.html /factura-electronica-servicio-tecnico.html /plantilla-orden-de-servicio-tecnico.html /sistema-vs-excel-servicio-tecnico.html
 			method GET
 		}
 		templates @prerendered {

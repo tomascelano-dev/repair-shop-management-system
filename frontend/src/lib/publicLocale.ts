@@ -2,10 +2,10 @@ import { useLocation } from 'react-router-dom'
 
 export type PublicLocale = 'es' | 'en'
 /** Long-tail guide pages (features/public/guides.tsx). Spanish only: they answer searches made in Argentina. */
-export type GuideSection = 'guide-phones' | 'guide-orders' | 'guide-stock' | 'guide-invoicing'
+export type GuideSection = 'guide-phones' | 'guide-orders' | 'guide-stock' | 'guide-invoicing' | 'guide-template' | 'guide-vs-excel'
 export type PublicSection = 'home' | 'pricing' | 'signup' | 'terms' | 'privacy' | 'refunds' | 'withdrawal' | GuideSection
 
-export const GUIDE_SECTIONS: readonly GuideSection[] = ['guide-phones', 'guide-orders', 'guide-stock', 'guide-invoicing']
+export const GUIDE_SECTIONS: readonly GuideSection[] = ['guide-phones', 'guide-orders', 'guide-template', 'guide-stock', 'guide-invoicing', 'guide-vs-excel']
 
 const es: Record<PublicSection, string> = {
   home: '/', pricing: '/precios', signup: '/registro', terms: '/terminos', privacy: '/privacidad', refunds: '/reembolsos', withdrawal: '/arrepentimiento',
@@ -13,6 +13,8 @@ const es: Record<PublicSection, string> = {
   'guide-orders': '/orden-de-reparacion-online',
   'guide-stock': '/control-de-stock-de-repuestos',
   'guide-invoicing': '/factura-electronica-servicio-tecnico',
+  'guide-template': '/plantilla-orden-de-servicio-tecnico',
+  'guide-vs-excel': '/sistema-vs-excel-servicio-tecnico',
 }
 const en: Partial<Record<PublicSection, string>> = {
   home: '/en', pricing: '/en/pricing', signup: '/en/signup', terms: '/en/terms', privacy: '/en/privacy', refunds: '/en/refunds', withdrawal: '/en/withdrawal',

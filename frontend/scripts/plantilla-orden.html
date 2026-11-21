@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Orden de servicio técnico · Plantilla gratuita de RepairShop</title>
+<style>
+  @page { size: A4; margin: 10mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #0f172a; font-size: 10.5pt; }
+  .sheet { width: 190mm; }
+  .head { display: flex; gap: 6mm; align-items: stretch; }
+  .shop { flex: 1; border: 1px solid #94a3b8; border-radius: 3mm; padding: 3mm; min-height: 20mm; color: #64748b; font-size: 9pt; }
+  .title { width: 72mm; border: 2px solid #2547ea; border-radius: 3mm; padding: 3mm; }
+  .title h1 { margin: 0; font-size: 13pt; color: #2547ea; letter-spacing: .02em; }
+  .row { display: flex; gap: 4mm; margin-top: 1.6mm; }
+  .field { flex: 1; display: flex; align-items: flex-end; gap: 2mm; white-space: nowrap; }
+  .field span { font-size: 8.5pt; color: #475569; }
+  .line { flex: 1; min-width: 12mm; border-bottom: 1px solid #94a3b8; height: 4.8mm; }
+  h2 { margin: 2.8mm 0 .8mm; font-size: 9.5pt; text-transform: uppercase; letter-spacing: .06em; color: #2547ea; border-bottom: 1.5px solid #2547ea; padding-bottom: .8mm; }
+  .checks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4mm 4mm; margin-top: 1.5mm; font-size: 9pt; }
+  .check { display: flex; align-items: center; gap: 1.5mm; }
+  .box { width: 3.4mm; height: 3.4mm; border: 1px solid #475569; border-radius: .6mm; flex: none; }
+  .opts { color: #64748b; font-size: 8pt; margin-left: auto; }
+  .area { border: 1px solid #94a3b8; border-radius: 2mm; height: 12mm; margin-top: 1.2mm; }
+  table { width: 100%; border-collapse: collapse; margin-top: 1.5mm; font-size: 9pt; }
+  th, td { border: 1px solid #94a3b8; padding: 1.2mm 2mm; text-align: left; }
+  th { background: #eef2ff; color: #1e3a8a; font-weight: 600; }
+  td { height: 5.2mm; }
+  td.amount { width: 32mm; }
+  .terms { font-size: 7.8pt; color: #334155; line-height: 1.35; margin-top: 1.5mm; }
+  .signs { display: flex; gap: 8mm; margin-top: 6mm; }
+  .sign { flex: 1; border-top: 1px solid #475569; padding-top: 1mm; font-size: 8.5pt; color: #475569; text-align: center; }
+  .cut { margin: 4mm 0 2.5mm; border-top: 1.5px dashed #64748b; position: relative; }
+  .cut span { position: absolute; top: -2.6mm; left: 50%; transform: translateX(-50%); background: #fff; padding: 0 2mm; font-size: 8pt; color: #64748b; }
+  .stub { border: 1px solid #94a3b8; border-radius: 3mm; padding: 3mm; }
+  .stub h3 { margin: 0; font-size: 10pt; color: #2547ea; }
+  .foot { margin-top: 3mm; font-size: 7.5pt; color: #64748b; text-align: center; }
+  .foot b { color: #2547ea; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="head">
+    <div class="shop">Logo y datos del taller (nombre, dirección, teléfono, WhatsApp, CUIT)</div>
+    <div class="title">
+      <h1>ORDEN DE SERVICIO TÉCNICO</h1>
+      <div class="row"><div class="field"><span>N.º</span><div class="line"></div></div></div>
+      <div class="row"><div class="field"><span>Fecha de ingreso</span><div class="line"></div></div></div>
+      <div class="row"><div class="field"><span>Fecha prometida</span><div class="line"></div></div></div>
+    </div>
+  </div>
+
+  <h2>Cliente</h2>
+  <div class="row"><div class="field"><span>Nombre y apellido</span><div class="line"></div></div><div class="field" style="flex:.7"><span>DNI / CUIT</span><div class="line"></div></div></div>
+  <div class="row"><div class="field"><span>Teléfono / WhatsApp</span><div class="line"></div></div><div class="field"><span>Email</span><div class="line"></div></div></div>
+
+  <h2>Equipo</h2>
+  <div class="row"><div class="field"><span>Tipo</span><div class="line"></div></div><div class="field"><span>Marca</span><div class="line"></div></div><div class="field"><span>Modelo</span><div class="line"></div></div><div class="field" style="flex:.7"><span>Color</span><div class="line"></div></div></div>
+  <div class="row"><div class="field"><span>IMEI / N.º de serie</span><div class="line"></div></div><div class="field"><span>Accesorios entregados (funda, chip, cargador…)</span><div class="line"></div></div></div>
+  <div class="row"><div class="field" style="color:#475569;font-size:8.5pt">Código de desbloqueo: se solicita aparte y no se anota en esta hoja.</div></div>
+
+  <h2>Estado al ingreso</h2>
+  <div class="checks">
+    <div class="check"><div class="box"></div>Enciende</div>
+    <div class="check"><div class="box"></div>Pantalla / táctil</div>
+    <div class="check"><div class="box"></div>Cámaras</div>
+    <div class="check"><div class="box"></div>Audio y micrófono</div>
+    <div class="check"><div class="box"></div>Botones</div>
+    <div class="check"><div class="box"></div>Carga</div>
+    <div class="check"><div class="box"></div>Wi-Fi / señal</div>
+    <div class="check"><div class="box"></div>Face ID / huella</div>
+    <div class="check"><div class="box"></div>Signos de humedad</div>
+    <div class="check"><div class="box"></div>Cuenta en la nube bloqueada</div>
+    <div class="check"><div class="box"></div>Rayones / golpes</div>
+    <div class="check"><div class="box"></div>Marco o tapa dañados</div>
+  </div>
+  <div class="row"><div class="field"><span>Observaciones</span><div class="line"></div></div></div>
+
+  <h2>Falla informada por el cliente</h2>
+  <div class="area"></div>
+
+  <h2>Diagnóstico y presupuesto</h2>
+  <div class="area" style="height:11mm"></div>
+  <table>
+    <tr><th>Repuesto / trabajo</th><th class="amount">Importe</th></tr>
+    <tr><td></td><td></td></tr>
+    <tr><td></td><td></td></tr>
+    <tr><td></td><td></td></tr>
+    <tr><td style="text-align:right;font-weight:600">Total</td><td></td></tr>
+  </table>
+  <div class="row">
+    <div class="field"><span>Seña</span><div class="line"></div></div>
+    <div class="field"><span>Saldo</span><div class="line"></div></div>
+    <div class="field"><span>Presupuesto válido por</span><div class="line"></div><span>días</span></div>
+    <div class="field"><span>Garantía</span><div class="line"></div><span>días</span></div>
+  </div>
+  <div class="row">
+    <div class="check" style="font-size:9pt"><div class="box"></div>Presupuesto aprobado</div>
+    <div class="check" style="font-size:9pt"><div class="box"></div>Presupuesto rechazado</div>
+    <div class="field"><span>Fecha</span><div class="line"></div></div>
+  </div>
+
+  <h2>Condiciones de recepción</h2>
+  <div class="terms">
+    El equipo se recibe para diagnóstico en el estado descripto arriba. El presupuesto tiene la validez indicada y no incluye
+    fallas que aparezcan durante la reparación, que se informarán antes de seguir. La garantía cubre solo el trabajo y los
+    repuestos colocados, por el plazo indicado, y no cubre golpes, humedad ni intervenciones de terceros. El taller no se
+    responsabiliza por la información guardada en el equipo: se recomienda hacer una copia de seguridad antes de dejarlo.
+    Los equipos no retirados dentro de los ______ días de avisada su finalización quedarán sujetos a ______________________.
+  </div>
+
+  <div class="signs">
+    <div class="sign">Firma y aclaración del cliente (ingreso)</div>
+    <div class="sign">Recibió por el taller</div>
+    <div class="sign">Firma del cliente (retiro conforme)</div>
+  </div>
+
+  <div class="cut"><span>✂ Talón para el cliente</span></div>
+  <div class="stub">
+    <h3>Comprobante de ingreso · Presentar para retirar el equipo</h3>
+    <div class="row"><div class="field"><span>Orden N.º</span><div class="line"></div></div><div class="field"><span>Fecha</span><div class="line"></div></div><div class="field"><span>Equipo</span><div class="line"></div></div></div>
+    <div class="row"><div class="field"><span>Cliente</span><div class="line"></div></div><div class="field"><span>Teléfono del taller</span><div class="line"></div></div></div>
+  </div>
+
+  <div class="foot">Plantilla gratuita de <b>RepairShop</b>, sistema para servicio técnico. Órdenes online con seguimiento por QR, presupuestos que el cliente aprueba desde su celular y avisos por WhatsApp: <b>app.techxto.ar</b></div>
+</div>
+</body>
+</html>

@@ -11,6 +11,10 @@ export interface GuideBlock {
   items?: string[]
   /** Another guide this block points to. */
   related?: GuideSection
+  /** Comparison table (first column = what is compared). */
+  table?: { head: string[]; rows: string[][] }
+  /** Free file to download (lead magnet), with a preview image. */
+  download?: { href: string; label: string; preview: string; previewAlt: string; note?: string }
 }
 
 export interface Guide {
@@ -220,9 +224,123 @@ const invoicing: Guide = {
   ],
 }
 
+const template: Guide = {
+  section: 'guide-template',
+  title: 'Plantilla de orden de servicio técnico gratis | RepairShop',
+  description: 'Descarga gratis una plantilla de orden de servicio técnico en PDF para imprimir: cliente, equipo, checklist de ingreso, presupuesto, firmas y talón de retiro.',
+  linkText: 'Plantilla de orden de servicio técnico (PDF gratis)',
+  eyebrow: 'Descarga gratis',
+  heading: 'Plantilla de orden de servicio técnico gratis para imprimir',
+  intro: 'Si todavía trabajas en papel, una buena orden de servicio técnico te evita discusiones: deja por escrito qué equipo entró, en qué estado, qué falla contó el cliente y qué presupuesto aceptó. Esta plantilla está pensada para talleres de celulares, computadoras y electrónica. Es una hoja A4 en PDF, gratis y sin registrarte.',
+  blocks: [
+    {
+      heading: 'Descarga la plantilla',
+      download: {
+        href: '/plantillas/orden-de-servicio-tecnico.pdf',
+        label: 'Descargar la plantilla en PDF',
+        preview: '/plantillas/orden-de-servicio-tecnico.png',
+        previewAlt: 'Vista previa de la plantilla de orden de servicio técnico: datos del cliente y del equipo, checklist de ingreso, presupuesto, firmas y talón para el cliente',
+        note: 'Hoja A4, lista para imprimir. Puedes escribir a mano o completarla en la computadora antes de imprimir.',
+      },
+    },
+    {
+      heading: 'Qué incluye',
+      items: [
+        'Espacio para el logo y los datos de tu taller, número de orden, fecha de ingreso y fecha prometida.',
+        'Datos del cliente: nombre, DNI o CUIT, teléfono, WhatsApp y email.',
+        'Datos del equipo: tipo, marca, modelo, color, IMEI o número de serie y accesorios entregados.',
+        'Checklist de estado al ingreso: encendido, pantalla, cámaras, audio, botones, carga, señal, biometría, humedad y daños estéticos.',
+        'Falla informada, diagnóstico y presupuesto por ítems con seña, saldo, validez y días de garantía.',
+        'Condiciones de recepción, firmas de ingreso y retiro conforme, y un talón recortable que el cliente presenta para retirar.',
+      ],
+    },
+    {
+      heading: 'Cómo completarla bien',
+      items: [
+        'Numera las órdenes de forma correlativa y anota el mismo número en el talón y en una etiqueta pegada al equipo.',
+        'Revisa el equipo delante del cliente y marca el checklist con él: es tu respaldo si después aparece un daño.',
+        'Copia la falla con las palabras del cliente; el diagnóstico técnico va aparte.',
+        'No anotes el PIN, la contraseña ni el patrón en la hoja: pídelos aparte y guárdalos de forma segura.',
+        'Completa los días de validez del presupuesto, la garantía y el plazo para retirar, y revisa las condiciones con tu asesor según tu negocio.',
+      ],
+    },
+    {
+      heading: 'Cuando el papel ya no alcanza',
+      paragraphs: [
+        'Con muchas órdenes por semana, el papel tiene límites: no se puede buscar, se pierde y el cliente igual llama para preguntar cómo va su equipo. En RepairShop la misma orden es digital: lleva firma en pantalla, fotos y un código QR con el que el cliente sigue la reparación y aprueba el presupuesto desde su celular, y el comprobante se imprime en PDF con tus condiciones.',
+      ],
+      related: 'guide-orders',
+    },
+  ],
+  faq: [
+    ['¿La plantilla es gratis?', 'Sí. Puedes descargarla, imprimirla y usarla en tu taller sin registrarte ni pagar nada.'],
+    ['¿Puedo poner el logo de mi taller?', 'Sí. Arriba a la izquierda hay un recuadro para el logo y los datos del taller: puedes pegar un sello, escribirlos o agregarlos con un editor de PDF antes de imprimir.'],
+    ['¿Cuántas copias tengo que imprimir?', 'Una hoja por equipo alcanza: el taller se queda con la hoja y el cliente se lleva el talón recortable para retirar. Si prefieres que el cliente tenga la orden completa, imprime dos.'],
+    ['¿Sirve para computadoras y consolas?', 'Sí. Los campos de equipo e IMEI o número de serie sirven para celulares, tablets, computadoras, consolas y electrónica en general.'],
+  ],
+}
+
+const vsExcel: Guide = {
+  section: 'guide-vs-excel',
+  title: 'Sistema para servicio técnico vs Excel o cuaderno | RepairShop',
+  description: 'Cuaderno, Excel o sistema para tu servicio técnico: qué resuelve cada uno, cuándo alcanza con una planilla y cuándo conviene pasar a un sistema.',
+  linkText: 'Sistema, Excel o cuaderno: cuál conviene',
+  eyebrow: 'Comparativa',
+  heading: 'Cuaderno, Excel o sistema para servicio técnico: cuál conviene',
+  intro: 'Casi todos los talleres empiezan con un cuaderno o una planilla de Excel, y está bien: son gratis y no hay que aprender nada. El problema aparece cuando crecen las órdenes, los técnicos y los repuestos. Esta comparación te ayuda a decidir con honestidad si te conviene seguir como estás o pasar a un sistema.',
+  blocks: [
+    {
+      heading: 'Cuándo alcanza con un cuaderno o un Excel',
+      paragraphs: ['Si reparas pocos equipos por semana, trabajas solo, casi no tienes stock de repuestos y tus clientes no te llaman para preguntar por su equipo, un cuaderno ordenado o una planilla bien armada pueden ser suficientes. En ese caso, una buena plantilla de orden en papel resuelve lo más importante: tener constancia de cómo entró cada equipo.'],
+      related: 'guide-template',
+    },
+    {
+      heading: 'Dónde empieza a complicarse',
+      items: [
+        'Buscar una orden vieja cuando el cliente vuelve por la garantía.',
+        'Responder todo el día «¿cómo va mi equipo?» por teléfono y WhatsApp.',
+        'Saber qué repuesto ya está prometido a una reparación y cuál se puede vender.',
+        'Cobrar señas y saldos sin perder la cuenta de quién debe qué.',
+        'Que dos personas editen la misma planilla y se pisen los datos.',
+      ],
+    },
+    {
+      heading: 'Comparación punto por punto',
+      table: {
+        head: ['', 'Cuaderno', 'Excel', 'RepairShop'],
+        rows: [
+          ['Buscar una orden', 'Hojear páginas', 'Filtros, si todo se cargó igual', 'Por número, cliente, equipo o IMEI'],
+          ['Constancia del estado del equipo', 'Lo que se anote', 'Una celda de texto', 'Checklist, fotos y firma del cliente'],
+          ['El cliente consulta cómo va', 'Llama al taller', 'Llama al taller', 'Enlace y código QR de seguimiento'],
+          ['Aprobación del presupuesto', 'En persona o por teléfono', 'Por teléfono o WhatsApp', 'Online, con fecha registrada'],
+          ['Repuestos para cada orden', 'No se controla', 'Fórmulas hechas a mano', 'Reservados al aprobar el presupuesto'],
+          ['Varias personas a la vez', 'Un solo cuaderno', 'Riesgo de pisar cambios', 'Usuarios ilimitados con permisos por rol'],
+          ['Caja y factura electrónica', 'Por separado', 'Por separado', 'Incluidas'],
+          ['Costo', 'Casi nulo', 'Gratis o la licencia de Office', 'Plan mensual, con prueba gratis'],
+        ],
+      },
+    },
+    {
+      heading: 'Cómo pasar de Excel a RepairShop sin empezar de cero',
+      paragraphs: [
+        'Importas tus clientes y tus artículos de stock desde un archivo de Excel o CSV, con una prueba previa que muestra qué se va a crear. Puedes empezar usando solo las órdenes y el seguimiento, y sumar stock, caja y facturación cuando estés cómodo. Y si algún día quieres llevarte los datos, los exportas a Excel.',
+      ],
+      related: 'guide-orders',
+    },
+  ],
+  faq: [
+    ['¿Puedo seguir usando Excel para algunas cosas?', 'Sí. Exportas clientes, inventario e informes a Excel cuando quieras, por ejemplo para tu contador.'],
+    ['¿Qué pasa con mis datos si dejo de pagar?', 'La cuenta queda en modo consulta: sigues viendo tus órdenes, clientes y stock, pero no puedes cargar datos nuevos hasta elegir un plan.'],
+    ['¿Cuánto tarda empezar?', 'Unos minutos: creas la cuenta, cargas el nombre del taller y ya puedes registrar la primera orden. Todo funciona en el navegador, sin instalar nada.'],
+    ['¿Es más caro que un cuaderno?', 'Sí, un cuaderno es casi gratis. La pregunta es cuánto tiempo pierdes buscando órdenes y respondiendo consultas: puedes probar todos los módulos gratis antes de decidir.'],
+  ],
+}
+
 export const GUIDES: Record<GuideSection, Guide> = {
   'guide-phones': phones,
   'guide-orders': orders,
+  'guide-template': template,
   'guide-stock': stock,
   'guide-invoicing': invoicing,
+  'guide-vs-excel': vsExcel,
 }
