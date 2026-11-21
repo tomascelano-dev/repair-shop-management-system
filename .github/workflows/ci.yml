@@ -136,6 +136,11 @@ jobs:
           check /orders 'content="noindex, nofollow"'
           check /t/token 'content="noindex, nofollow"'
           if curl -fsS http://127.0.0.1:8099/precios | grep -q noindex; then echo "/precios must be indexable"; exit 1; fi
+          # One <h1> per page: the shell's <noscript> fallback (with its own <h1>) stays only in the app shell.
+          check /orders '<noscript>'
+          for p in / /precios /sistema-servicio-tecnico-celulares /en; do
+            [ "$(curl -fsS "http://127.0.0.1:8099$p" | grep -o '<h1[ >]' | wc -l)" -eq 1 ] || { echo "$p must have exactly one <h1>"; exit 1; }
+          done
           # A signed-in browser gets the app at the bare domain.
           curl -fsS -H 'Cookie: rs_app=1' http://127.0.0.1:8099/ | grep -q 'id="root" class="h-full"></div>' || { echo "/ with rs_app does not serve the app"; exit 1; }
           # Site checkers often send HEAD first: it must not report an empty page.

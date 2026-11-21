@@ -89,6 +89,10 @@ function fillServerSide(markup, locale) {
 
 const shell = await readFile('dist/index.html', 'utf8')
 if (!shell.includes(SHELL_ROOT)) throw new Error(`dist/index.html has no ${SHELL_ROOT}`)
+// The shell's <noscript> fallback (with its own <h1>) is for the empty SPA shell. A pre-rendered page already has its
+// content, and keeping it would give the page a second <h1>.
+const NOSCRIPT = /\s*<noscript>[\s\S]*?<\/noscript>/
+if (!NOSCRIPT.test(shell)) throw new Error('dist/index.html has no <noscript> fallback to drop from the pre-rendered pages')
 // The SPA shell (the app, the customer tracking portal /t/...) is never indexed; only the pre-rendered pages are.
 if (!shell.includes(NOINDEX)) throw new Error(`dist/index.html must carry ${NOINDEX}`)
 
@@ -98,10 +102,13 @@ for (const page of PUBLIC_PAGES) {
   const html = shell
     .replace(/<html lang="[^"]*"/, `<html lang="${page.locale}"`)
     .replace(SHELL_ROOT, `<div id="root" class="h-full">${markup}</div>`)
+    .replace(NOSCRIPT, '')
     .replace(/<title>.*?<\/title>/, `<title>${escape(page.title)}</title>`)
     .replace(/<meta name="description" content="[^"]*" \/>/, `<meta name="description" content="${escape(page.description)}" />`)
     .replace(NOINDEX, seoHead(page))
   if (html.includes(NOINDEX)) throw new Error(`${page.path}: the public page kept the noindex of the app shell`)
+  const h1 = html.match(/<h1[\s>]/g)?.length ?? 0
+  if (h1 !== 1) throw new Error(`${page.path}: the pre-rendered page has ${h1} <h1> (it must have exactly one)`)
   await mkdir(dirname(`dist/${page.file}`), { recursive: true })
   await writeFile(`dist/${page.file}`, html)
   console.log(`prerendered ${page.path} -> dist/${page.file} (${markup.length} chars)`)
