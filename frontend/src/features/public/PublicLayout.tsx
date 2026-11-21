@@ -1,7 +1,8 @@
 import { useEffect, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { COOKIE_SETTINGS } from '../../lib/marketing'
-import { languagePath, publicPath, usePublicLocale } from '../../lib/publicLocale'
+import { GUIDE_SECTIONS, languagePath, publicPath, usePublicLocale } from '../../lib/publicLocale'
+import { GUIDES } from './guides'
 
 export function PublicHeader() {
   const locale = usePublicLocale()
@@ -29,7 +30,16 @@ export function PublicFooter() {
   const locale = usePublicLocale()
   const labels = locale === 'en' ? ['Pricing', 'Terms', 'Privacy', 'Refunds'] : ['Precios', 'Términos', 'Privacidad', 'Reembolsos']
   return (
-    <footer className="mx-auto flex max-w-6xl flex-wrap justify-center gap-4 px-4 py-8 text-xs text-slate-600">
+    <footer className="mx-auto max-w-6xl px-4 py-8 text-xs text-slate-600">
+      {/* The guides are Spanish only; linking them from every Spanish page helps crawlers find them. */}
+      {locale === 'es' ? (
+        <nav aria-label="Guías" className="mb-4 flex flex-wrap justify-center gap-x-4 gap-y-2">
+          {GUIDE_SECTIONS.map((section) => (
+            <Link key={section} to={publicPath('es', section)} className="hover:underline">{GUIDES[section].linkText}</Link>
+          ))}
+        </nav>
+      ) : null}
+      <div className="flex flex-wrap justify-center gap-4">
       {(['pricing', 'terms', 'privacy', 'refunds'] as const).map((section, i) => (
         <Link key={section} to={publicPath(locale, section)} className="hover:underline">{labels[i]}</Link>
       ))}
@@ -40,6 +50,7 @@ export function PublicFooter() {
       <button type="button" onClick={() => window.dispatchEvent(new Event(COOKIE_SETTINGS))} className="underline">
         {locale === 'en' ? 'Cookie settings' : 'Preferencias de cookies'}
       </button>
+      </div>
     </footer>
   )
 }

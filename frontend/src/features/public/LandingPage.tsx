@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { billingApi } from '../../api/endpoints'
-import { publicPath, usePublicLocale } from '../../lib/publicLocale'
+import { GUIDE_SECTIONS, publicPath, usePublicLocale } from '../../lib/publicLocale'
+import { GUIDES } from './guides'
 import { SEO_TITLES } from '../../lib/seo'
 import { PublicLayout } from './PublicLayout'
 
@@ -98,6 +99,16 @@ export function LandingPage() {
               </article>
             ))}
           </div>
+          {en ? null : (
+            <nav aria-label="Guías" className="mt-8">
+              <h3 className="font-semibold text-slate-900">Guías para tu taller</h3>
+              <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                {GUIDE_SECTIONS.map((section) => (
+                  <li key={section}><Link to={publicPath('es', section)} className="font-semibold text-brand-700 underline">{GUIDES[section].linkText}</Link></li>
+                ))}
+              </ul>
+            </nav>
+          )}
         </section>
         <section className="mt-16">
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">{en ? 'Frequently asked questions' : 'Preguntas frecuentes'}</h2>

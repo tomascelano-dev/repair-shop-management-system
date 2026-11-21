@@ -118,6 +118,15 @@ jobs:
           check /en/terms 'The service is provided by Taller Ejemplo'
           check /en/refunds 'mailto:soporte@example.com'
           check /en/pricing 'lang="en"'
+          # Long-tail guides (Spanish only), linked from the footer of every Spanish page.
+          check /sistema-servicio-tecnico-celulares 'Sistema para servicio técnico de celulares</h1>'
+          check /orden-de-reparacion-online 'Orden de servicio técnico online'
+          check /control-de-stock-de-repuestos 'Control de stock de repuestos para tu taller'
+          check /factura-electronica-servicio-tecnico 'Factura electrónica ARCA para servicio técnico</h1>'
+          check / 'href="/orden-de-reparacion-online"'
+          check /factura-electronica-servicio-tecnico 'href="/registro"'
+          check /factura-electronica-servicio-tecnico '<link rel="canonical" href="https://ci.example.com/factura-electronica-servicio-tecnico" />'
+          check /sitemap.xml '<loc>https://ci.example.com/control-de-stock-de-repuestos</loc>'
           # Search engines: sitemap and canonical URLs with the public domain; the app is never indexed.
           check /robots.txt 'Sitemap: https://ci.example.com/sitemap.xml'
           check /sitemap.xml '<loc>https://ci.example.com/precios</loc>'
@@ -130,7 +139,8 @@ jobs:
           # A signed-in browser gets the app at the bare domain.
           curl -fsS -H 'Cookie: rs_app=1' http://127.0.0.1:8099/ | grep -q 'id="root" class="h-full"></div>' || { echo "/ with rs_app does not serve the app"; exit 1; }
           # Site checkers often send HEAD first: it must not report an empty page.
-          for p in / /precios /terminos /privacidad /reembolsos /en /en/pricing /en/terms /en/privacy /en/refunds; do
+          for p in / /precios /terminos /privacidad /reembolsos /en /en/pricing /en/terms /en/privacy /en/refunds \
+            /sistema-servicio-tecnico-celulares /orden-de-reparacion-online /control-de-stock-de-repuestos /factura-electronica-servicio-tecnico; do
             len=$(curl -fsSI "http://127.0.0.1:8099$p" | tr -d '\r' | awk 'tolower($1)=="content-length:" {print $2}')
             [ "${len:-0}" -gt 1000 ] || { echo "HEAD $p reports Content-Length ${len:-none}"; exit 1; }
           done

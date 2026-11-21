@@ -1,5 +1,5 @@
 // Writes dist/<page>.html for the public pages (see src/prerender.tsx). The web server serves them for
-// /precios, /terminos, /privacidad and /reembolsos; everything else keeps getting the SPA shell (index.html).
+// /precios, /terminos, /privacidad, /reembolsos, the guides...; everything else keeps getting the SPA shell (index.html).
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { build } from 'vite'
 import { dirname } from 'node:path'
@@ -114,7 +114,7 @@ const entries = PUBLIC_PAGES.map((page) => [
   '  <url>',
   `    <loc>${url(page.path)}</loc>`,
   `    <lastmod>${today}</lastmod>`,
-  `    <priority>${priority[page.section] ?? '0.3'}</priority>`,
+  `    <priority>${priority[page.section] ?? (page.section.startsWith('guide-') ? '0.7' : '0.3')}</priority>`,
   ...Object.entries(page.alternates).map(([lang, path]) => `    <xhtml:link rel="alternate" hreflang="${lang}" href="${url(path)}" />`),
   `    <xhtml:link rel="alternate" hreflang="x-default" href="${url(page.alternates.es)}" />`,
   '  </url>',

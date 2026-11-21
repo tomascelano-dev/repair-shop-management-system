@@ -6,6 +6,7 @@ import { AppLayout } from './components/layout/AppLayout'
 import { Loading } from './components/ui'
 import { Marketing } from './components/Marketing'
 import { useSession } from './auth/session'
+import { GUIDE_SECTIONS, publicPath } from './lib/publicLocale'
 import { AcceptInvitationPage, ForgotPasswordPage, LoginPage, ResetPasswordPage } from './features/auth/AuthPages'
 
 // Route-level code splitting: each section downloads only when it is opened.
@@ -41,6 +42,7 @@ const TermsPage = page(() => import('./features/public/LegalPages'), 'TermsPage'
 const PrivacyPage = page(() => import('./features/public/LegalPages'), 'PrivacyPage')
 const RefundPage = page(() => import('./features/public/LegalPages'), 'RefundPage')
 const WithdrawalPage = page(() => import('./features/public/WithdrawalPage'), 'WithdrawalPage')
+const GuidePage = page(() => import('./features/public/GuidePage'), 'GuidePage')
 
 function Guard({ permission, children }: { permission: Permission; children: ReactNode }) {
   return <RequirePermission permission={permission}>{children}</RequirePermission>
@@ -72,6 +74,7 @@ export default function App() {
         <Route path="/privacidad" element={<PrivacyPage />} />
         <Route path="/reembolsos" element={<RefundPage />} />
         <Route path="/arrepentimiento" element={<WithdrawalPage />} />
+        {GUIDE_SECTIONS.map((section) => <Route key={section} path={publicPath('es', section)} element={<GuidePage />} />)}
 
         <Route
           element={

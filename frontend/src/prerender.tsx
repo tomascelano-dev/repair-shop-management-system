@@ -7,10 +7,12 @@ import { StaticRouter } from 'react-router-dom/server'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { BillingConfig, PlansResponse } from './api/types'
 import { LandingPage } from './features/public/LandingPage'
-import { publicPath, type PublicLocale, type PublicSection } from './lib/publicLocale'
+import { GUIDE_SECTIONS, publicPath, type PublicLocale, type PublicSection } from './lib/publicLocale'
 import { SEO_TITLES } from './lib/seo'
 import { PricingPage } from './features/public/PricingPage'
 import { PrivacyPage, RefundPage, TermsPage } from './features/public/LegalPages'
+import { GuidePage } from './features/public/GuidePage'
+import { GUIDES } from './features/public/guides'
 
 /** Default Argentine prices (backend Billing:Countries:AR:Prices). The live page fetches the configured prices on load. */
 const PLANS: PlansResponse = {
@@ -31,8 +33,8 @@ export interface PublicPage {
   file: string
   title: string
   description: string
-  /** Same page in each language (hreflang). */
-  alternates: Record<PublicLocale, string>
+  /** Same page in each language that has it (hreflang). The guides exist only in Spanish. */
+  alternates: Partial<Record<PublicLocale, string>> & { es: string }
   /** Text the rendered page must contain (the build fails otherwise). */
   expect: string
   element: () => ReactElement
@@ -42,7 +44,7 @@ export interface PublicPage {
  * Titles and descriptions are what Google shows in the results: they carry the searches the product answers
  * ("sistema para servicio técnico", "software para taller de celulares"). Keep titles under ~60 characters.
  */
-export const PUBLIC_PAGES: PublicPage[] = (['es', 'en'] as const).flatMap((locale) => {
+export const PUBLIC_PAGES: PublicPage[] = (['es', 'en'] as const).flatMap<PublicPage>((locale) => {
   const en = locale === 'en'
   const pages = [
     {
@@ -72,7 +74,15 @@ export const PUBLIC_PAGES: PublicPage[] = (['es', 'en'] as const).flatMap((local
     return { ...page, locale, path, file: path === '/' ? 'home.html' : `${path.slice(1)}.html`,
       alternates: { es: publicPath('es', page.section), en: publicPath('en', page.section) } }
   })
-})
+}).concat(GUIDE_SECTIONS.map((section) => {
+  // Long-tail guides (features/public/guides.ts): Spanish only, so their only alternate is themselves.
+  const guide = GUIDES[section]
+  const path = publicPath('es', section)
+  return {
+    section, locale: 'es' as const, path, file: `${path.slice(1)}.html`, title: guide.title, description: guide.description,
+    alternates: { es: path }, expect: guide.heading, element: () => <GuidePage />,
+  }
+}))
 
 /** Prices in the structured data of the landing and pricing pages (the same defaults the page shows). */
 // Build-time SSR entry, not a Fast Refresh component module.
