@@ -10,10 +10,12 @@ import { Alert, Badge, Button, Card, ConfirmDialog, ErrorState, KeyValue, Loadin
 import { CORE_FEATURES, currencyName, PLAN_TAGLINE, planFeatures, planPrice, SUBSCRIPTION_STATUS } from '../../lib/billing'
 import { cn } from '../../lib/cn'
 import { date, money } from '../../lib/format'
+import { useSession } from '../../auth/session'
 import { SUBSCRIPTION_KEY } from './shared'
 
 export function BillingPage() {
   const qc = useQueryClient()
+  const { user } = useSession()
   // Mercado Pago sends the customer back here with ?preapproval_id=... after the checkout.
   const [params] = useSearchParams()
   const [waitingPayment, setWaitingPayment] = useState(() => params.has('preapproval_id'))
@@ -66,6 +68,9 @@ export function BillingPage() {
     onError: (err) => toast.error(errorMessage(err)),
   })
 
+  // Same address the API sends to Mercado Pago (without a "+alias", which Mercado Pago rejects).
+  const payerEmail = user?.email ? user.email.replace(/\+[^@]*(?=@)/, '') : null
+
   if (sub.isLoading) return <Loading />
   if (sub.isError || !sub.data) return <ErrorState error={errorMessage(sub.error)} onRetry={() => void sub.refetch()} />
   const s = sub.data
@@ -98,6 +103,11 @@ export function BillingPage() {
         <>
           {!s.checkoutAvailable ? (
             <Alert tone="amber">Todavía no cobramos online en tu país. Escribinos y activamos tu plan a mano.</Alert>
+          ) : !s.canManageAtProvider && payerEmail ? (
+            <p className="text-sm text-slate-600">
+              Al pagar, entrá a Mercado Pago con la cuenta de <strong>{payerEmail}</strong>: Mercado Pago pide que la suscripción la pague el
+              mismo email.
+            </p>
           ) : null}
           <div className="grid gap-4 md:grid-cols-3">
             {s.plans.map((p) => (

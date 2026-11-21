@@ -34,6 +34,19 @@ public sealed class MercadoPagoSubscriptionGateway : ISubscriptionGateway
 
     public bool IsConfigured(string country) => MercadoPagoCountries.IsSupported(country) && _options.Account(country)?.IsConfigured == true;
 
+    /// <summary>
+    /// Email sent to Mercado Pago as the payer. Mercado Pago rejects addresses with a "+alias" ("User bad request",
+    /// measured 2026-11-21), so the alias is dropped: same mailbox, and usually the email of the payer's MP account.
+    /// </summary>
+    public static string PayerEmail(string email)
+    {
+        var e = (email ?? "").Trim();
+        var at = e.LastIndexOf('@');
+        if (at <= 0) return e;
+        var plus = e.IndexOf('+');
+        return plus > 0 && plus < at ? e[..plus] + e[at..] : e;
+    }
+
     public static string ExternalReference(Guid organizationId, PlanId plan) => $"org:{organizationId:N}:plan:{plan}";
 
     public static (Guid? OrganizationId, PlanId? Plan) ParseExternalReference(string? value)
@@ -51,7 +64,7 @@ public sealed class MercadoPagoSubscriptionGateway : ISubscriptionGateway
         {
             reason = r.Description,
             external_reference = ExternalReference(r.OrganizationId, r.Plan),
-            payer_email = r.PayerEmail,
+            payer_email = PayerEmail(r.PayerEmail),
             auto_recurring = new { frequency = 1, frequency_type = "months", transaction_amount = r.Amount, currency_id = r.Currency },
             back_url = r.ReturnUrl,
             status = "pending"
@@ -150,6 +163,9 @@ public sealed class MercadoPagoSubscriptionGateway : ISubscriptionGateway
                 // 401/403 mean the platform's credentials are wrong, which retrying will not fix.
                 if (res.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
                     throw new DomainException(MisconfiguredMessage);
+                // 4xx: Mercado Pago rejected the data, retrying won't help. 5xx/429: temporary.
+                if ((int)res.StatusCode is >= 400 and < 500 and not 429)
+                    throw new DomainException($"Mercado Pago no aceptó {what} ({(int)res.StatusCode}). Escribinos y lo resolvemos.");
                 throw new DomainException($"Mercado Pago no pudo {what} ({(int)res.StatusCode}). Probá de nuevo en unos minutos.");
             }
             return JsonDocument.Parse(body);

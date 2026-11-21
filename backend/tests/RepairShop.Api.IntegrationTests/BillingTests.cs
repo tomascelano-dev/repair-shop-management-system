@@ -201,6 +201,17 @@ public sealed class BillingTests
     }
 
     [IntegrationFact]
+    public async Task A_payer_email_with_an_alias_is_sent_without_it()
+    {
+        var alias = $"dueno{Guid.NewGuid():N}"[..14];
+        var (owner, _) = await ApiClient.SignupAsync(_factory, "MX", $"{alias}+taller@example.com");
+
+        var url = (await (await owner.Post("/billing/checkout", new { plan = "Basic" })).DataAsync()).Str("url");
+
+        _factory.MercadoPago.Preapproval(url.Split('=')[1])!["payer_email"]!.GetValue<string>().Should().Be($"{alias}@example.com");
+    }
+
+    [IntegrationFact]
     public async Task Notifications_for_the_same_subscription_arriving_together_are_all_accepted()
     {
         var (owner, _) = await ApiClient.SignupAsync(_factory, "MX");

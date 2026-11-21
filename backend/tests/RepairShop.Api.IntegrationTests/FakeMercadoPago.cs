@@ -80,6 +80,9 @@ public sealed class FakeMercadoPago
 
             if (request.Method == HttpMethod.Post && path == "preapproval")
             {
+                // Like the real API (measured 2026-11-21): a payer email with "+alias" is rejected.
+                if (body!["payer_email"]?.GetValue<string>()?.Contains('+') == true)
+                    return Json(HttpStatusCode.BadRequest, new JsonObject { ["message"] = "User bad request", ["status"] = 400 });
                 var id = Guid.NewGuid().ToString("N");
                 var p = new JsonObject
                 {
