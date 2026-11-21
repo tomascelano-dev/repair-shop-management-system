@@ -96,7 +96,7 @@ jobs:
       - name: Public pages have content without JavaScript
         # Payment-provider reviewers and crawlers read the HTML as served; the SPA shell alone is empty.
         run: |
-          docker run -d --name web -p 8099:80 -e CONTACT_EMAIL=soporte@example.com -e LEGAL_NAME='Taller Ejemplo' repairshop-web:ci
+          docker run -d --name web -p 8099:80 -e CONTACT_EMAIL=soporte@example.com -e LEGAL_NAME='Taller Ejemplo' -e PUBLIC_ORIGIN=https://ci.example.com repairshop-web:ci
           for i in $(seq 1 20); do curl -fsS -o /dev/null http://127.0.0.1:8099/precios && break; sleep 1; done
           check() { curl -fsS "http://127.0.0.1:8099$1" | grep -q "$2" || { echo "$1 does not contain: $2"; exit 1; }; }
           check /precios 'Profesional'
@@ -118,6 +118,15 @@ jobs:
           check /en/terms 'The service is provided by Taller Ejemplo'
           check /en/refunds 'mailto:soporte@example.com'
           check /en/pricing 'lang="en"'
+          # Search engines: sitemap and canonical URLs with the public domain; the app is never indexed.
+          check /robots.txt 'Sitemap: https://ci.example.com/sitemap.xml'
+          check /sitemap.xml '<loc>https://ci.example.com/precios</loc>'
+          check / '<link rel="canonical" href="https://ci.example.com/" />'
+          check /en/pricing 'hreflang="es" href="https://ci.example.com/precios"'
+          check / 'application/ld+json'
+          check /orders 'content="noindex, nofollow"'
+          check /t/token 'content="noindex, nofollow"'
+          if curl -fsS http://127.0.0.1:8099/precios | grep -q noindex; then echo "/precios must be indexable"; exit 1; fi
           # A signed-in browser gets the app at the bare domain.
           curl -fsS -H 'Cookie: rs_app=1' http://127.0.0.1:8099/ | grep -q 'id="root" class="h-full"></div>' || { echo "/ with rs_app does not serve the app"; exit 1; }
           # Site checkers often send HEAD first: it must not report an empty page.

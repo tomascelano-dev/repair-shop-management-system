@@ -140,6 +140,8 @@ services:
       # Shown in the pre-rendered Terms, Privacy and Refunds pages (the API sends the same values to the app).
       CONTACT_EMAIL: ${CONTACT_EMAIL:-}
       LEGAL_NAME: ${LEGAL_NAME:-}
+      # Absolute URLs for search engines and link previews: canonical, hreflang, Open Graph, sitemap.xml, robots.txt.
+      PUBLIC_ORIGIN: https://${DOMAIN}
     ports:
       - "127.0.0.1:${WEB_PORT:-8086}:80"
     healthcheck:
