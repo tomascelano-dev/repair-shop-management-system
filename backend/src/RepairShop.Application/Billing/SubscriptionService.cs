@@ -32,6 +32,12 @@ public sealed class SubscriptionService
     private readonly AdConversionService _conversions;
     private readonly BillingOptions _options;
     private readonly ILogger<SubscriptionService> _logger;
+    private readonly IAuditEventRepository _auditEvents;
+
+    /// <summary>A running subscription changes plan at most once in this window (security audit 2026-11-23, A-05): the
+    /// new amount only reaches Mercado Pago's next debit, so switching up and back down before it would mean using the
+    /// higher plan while paying the lower one.</summary>
+    public static readonly TimeSpan PlanChangeWindow = TimeSpan.FromDays(30);
 
     public SubscriptionService(
         ISubscriptionRepository subscriptions,
@@ -44,8 +50,10 @@ public sealed class SubscriptionService
         IAuditLog audit,
         AdConversionService conversions,
         IOptions<BillingOptions> options,
-        ILogger<SubscriptionService> logger)
+        ILogger<SubscriptionService> logger,
+        IAuditEventRepository auditEvents)
     {
+        _auditEvents = auditEvents;
         _subscriptions = subscriptions;
         _shops = shops;
         _users = users;
@@ -112,6 +120,10 @@ public sealed class SubscriptionService
         {
             if (sub.Plan == planId && sub.EffectiveStatus(now) == SubscriptionStatus.Active) throw new DomainException($"Ya estás en el plan {plan.Name}.");
             if (!_gateway.IsConfigured(country)) throw new DomainException("El cobro de suscripciones no está disponible en este momento.");
+            var auditShop = await AuditShopIdAsync(organizationId, ct);
+            if (auditShop is { } shopId && (await _auditEvents.SearchAsync(shopId, new AuditSearchOptions(EntityType: "subscription", EntityId: organizationId,
+                    Action: "subscription_plan_changed", DateFromUtc: now - PlanChangeWindow, Take: 1), ct)).Total > 0)
+                throw new DomainException("Ya cambiaste de plan en los últimos 30 días. Escribinos si necesitás cambiarlo de nuevo.");
             await _gateway.ChangePlanAsync(country, sub.ProviderSubscriptionId!, planId, price, currency, ct);
             var from = sub.Plan;
             sub.ChangePlanLocally(planId, now);
@@ -195,7 +207,7 @@ public sealed class SubscriptionService
             var (hasTs, hasV1, ageSeconds) = MercadoPagoSignature.Describe(n.Signature, _clock.UtcNow);
             _logger.LogWarning("Rejected Mercado Pago subscription webhook for {Country} with an invalid signature " +
                                "(x-signature: {HasHeader}, ts: {HasTs}, v1: {HasV1}, ts age: {AgeSeconds}s, x-request-id: {HasRequestId}, type: {Type}, data.id: {DataId}).",
-                country, !string.IsNullOrWhiteSpace(n.Signature), hasTs, hasV1, ageSeconds, !string.IsNullOrWhiteSpace(n.RequestId), n.Type, n.DataId);
+                country, !string.IsNullOrWhiteSpace(n.Signature), hasTs, hasV1, ageSeconds, !string.IsNullOrWhiteSpace(n.RequestId), LogSafe(n.Type), LogSafe(n.DataId));
             var variant = MercadoPagoSignature.MatchingVariant(account.WebhookSecret, n.Signature, n.RequestId, n.DataId);
             if (variant is null)
                 _logger.LogWarning("Mercado Pago {Country} webhook: no manifest variant matches either, so the configured webhook secret is not the one Mercado Pago signs with.", country);
@@ -265,6 +277,33 @@ public sealed class SubscriptionService
         return sub.OrganizationId;
     }
 
+    /// <summary>
+    /// Security audit 2026-11-23 (M-05): the state only moved by webhook, so a lost renewal notice expired a customer who
+    /// paid, and a refund or a cancellation done in Mercado Pago's panel kept the access. Once a day the subscriptions whose
+    /// period ends around now are read back from Mercado Pago (same path as a webhook: the provider's state, never ours).
+    /// </summary>
+    public async Task<int> ReconcileMercadoPagoAsync(CancellationToken ct)
+    {
+        var now = _clock.UtcNow;
+        var due = await _subscriptions.ListForReconciliationAsync(BillingProvider.MercadoPago, now.AddDays(-10), now.AddDays(3), 200, ct);
+        var applied = 0;
+        foreach (var sub in due)
+        {
+            if (sub.ProviderSubscriptionId is not { } id || !_gateway.IsConfigured(sub.BillingCountry)) continue;
+            try
+            {
+                var state = await _gateway.GetSubscriptionAsync(sub.BillingCountry, id, ct);
+                if (state is null) continue;
+                if (await _uow.RetryOnConflictAsync(c => ApplyAsync(sub.BillingCountry, state, c), ct, maxAttempts: 6) is not null) applied++;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "Could not reconcile Mercado Pago subscription {Id}.", id);
+            }
+        }
+        return applied;
+    }
+
     // ---------------------------------------------------------------------------------------------
 
     private async Task<Subscription> GetSubscriptionAsync(Guid organizationId, CancellationToken ct)
@@ -312,11 +351,20 @@ public sealed class SubscriptionService
 
     private async Task AuditAsync(Guid organizationId, string action, Actor actor, object data, CancellationToken ct)
     {
-        // Audit events are per shop: record them on the organization's first branch (its id is the organization id).
+        if (await AuditShopIdAsync(organizationId, ct) is not { } shopId) return;
+        await _audit.AddAsync(shopId, "subscription", organizationId, action, actor, data, ct);
+    }
+
+    // Security audit 2026-11-23 (B-07): values of an unauthenticated request go to the log without line breaks or control
+    // characters (a forged "%0A" would otherwise write fake log lines), and at most 64 characters.
+    private static string? LogSafe(string? value)
+        => value is null ? null : new string(value.Take(64).Select(c => char.IsControl(c) ? '?' : c).ToArray());
+
+    // Audit events are per shop: the organization's are on its first branch (its id is the organization id).
+    private async Task<Guid?> AuditShopIdAsync(Guid organizationId, CancellationToken ct)
+    {
         var shops = await _shops.ListByOrganizationAsync(organizationId, ct);
-        var shop = shops.FirstOrDefault(s => s.Id == organizationId) ?? shops.OrderBy(s => s.CreatedAtUtc).FirstOrDefault();
-        if (shop is null) return;
-        await _audit.AddAsync(shop.Id, "subscription", organizationId, action, actor, data, ct);
+        return (shops.FirstOrDefault(s => s.Id == organizationId) ?? shops.OrderBy(s => s.CreatedAtUtc).FirstOrDefault())?.Id;
     }
 }
 

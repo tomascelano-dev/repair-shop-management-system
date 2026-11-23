@@ -50,9 +50,14 @@ public sealed class ArcaFiscalAuthority : IFiscalAuthority
         }
     }
 
+    public static string CacheKey(FiscalCredentials c)
+        => $"arca:ta:{c.Cuit}:{c.Environment}:{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(c.CertificatePfx))}";
+
     private async Task<(string Token, string Sign)> LoginAsync(FiscalCredentials c, CancellationToken ct)
     {
-        var key = $"arca:ta:{c.Cuit}:{c.Environment}";
+        // The ticket belongs to the certificate that signed the login, not to the CUIT: two shops can type the same CUIT,
+        // and a ticket cached by CUIT alone would let the second one invoice with the first one's authorization.
+        var key = CacheKey(c);
         if (_cache.TryGetValue<(string, string)>(key, out var cached)) return cached;
 
         using var cert = new X509Certificate2(c.CertificatePfx, c.CertificatePassword, X509KeyStorageFlags.EphemeralKeySet);

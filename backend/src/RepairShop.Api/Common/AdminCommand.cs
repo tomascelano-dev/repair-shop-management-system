@@ -159,6 +159,15 @@ internal static class AdminCommand
 
         if (user is null)
         {
+            // Security audit 2026-11-23 (M-06): with shops already in the base, EnsureShopAsync returns the oldest one, so a
+            // mistyped email while "recovering access" would create an Admin inside somebody else's shop. A new email only
+            // creates the first admin of an empty base; everybody else signs up from the website.
+            if (await db.Shops.IgnoreQueryFilters().AnyAsync())
+            {
+                Console.Error.WriteLine($"No existe un usuario con el email {email} y la base ya tiene talleres: no se crea nada. " +
+                                        "Revisá el email (para recuperar un acceso tiene que ser exactamente el de la cuenta).");
+                return 1;
+            }
             var shop = await DbSeeder.EnsureShopAsync(db, clock, shopName);
             var hasher = sp.GetRequiredService<IPasswordHasher>();
             // Unusable random password until the invitation is accepted.

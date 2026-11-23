@@ -36,6 +36,18 @@ public sealed class SubscriptionTests
     }
 
     [Fact]
+    public void A02_a_mercado_pago_subscription_without_period_end_does_not_stay_active_forever()
+    {
+        var sub = Subscription.StartTrial(Org, "AR", 14, Now);
+        sub.ApplyProviderState(BillingProvider.MercadoPago, "pre2", PlanId.Pro, SubscriptionStatus.Active, null, 44900m, "ARS", null, Now, Now);
+
+        sub.EffectiveStatus(Now.AddDays(Subscription.MissingPeriodDays - 1)).Should().Be(SubscriptionStatus.Active);
+        sub.EffectiveStatus(Now.AddDays(Subscription.MissingPeriodDays + 1)).Should().Be(SubscriptionStatus.PastDue);
+        sub.HasFullAccess(Now.AddDays(Subscription.MissingPeriodDays) + Subscription.GracePeriod).Should().BeFalse();
+        Subscription.Complimentary(Org, PlanId.Pro, "AR", Now).HasFullAccess(Now.AddYears(3)).Should().BeTrue("a granted plan never expires");
+    }
+
+    [Fact]
     public void Canceled_subscription_works_until_the_end_of_the_paid_period()
     {
         var sub = Subscription.StartTrial(Org, "AR", 14, Now);

@@ -36,13 +36,23 @@ public sealed class UsersController : ControllerBase
     /// <summary>Users that can be assigned as technicians (any staff member can read it).</summary>
     [HttpGet("assignable")]
     public async Task<ActionResult<ApiResponse<List<UserAdminResponse>>>> Assignable(CancellationToken ct)
-        => Ok(Envelope.Ok(await _users.ListAssignableAsync(CurrentUser.GetShopId(User), ct)));
+    {
+        var users = await _users.ListAssignableAsync(CurrentUser.GetShopId(User), ct);
+        // Security audit 2026-11-23 (B-08): to pick a technician the rest of the staff only needs the id and the name; the
+        // emails, last sign-in and branch access of everybody stay with the admins.
+        if (CurrentUser.GetRole(User) != RepairShop.Domain.Users.UserRole.Admin)
+            users = users.Select(u => u with { Email = "", LastLoginAtUtc = null, Shops = Array.Empty<ShopAccessResponse>() }).ToList();
+        return Ok(Envelope.Ok(users));
+    }
 
     /// <summary>Creates the user with a pending invitation and returns the link to share (also emailed when configured).</summary>
     [HttpPost]
     [Authorize(Policy = Policies.AdminOnly)]
-    public async Task<ActionResult<ApiResponse<UserLinkResponse>>> Invite([FromBody] CreateUserRequest body, CancellationToken ct)
-        => Ok(Envelope.Ok(await _users.InviteAsync(CurrentUser.GetShopId(User), body, CurrentUser.GetActor(User), ct)));
+    public async Task<ActionResult<ApiResponse<UserLinkResponse>>> Invite([FromBody] CreateUserRequest body, [FromServices] RepairShop.Application.Abstractions.IUserRepository trustUsers, [FromServices] RepairShop.Application.Abstractions.IIntegrationStatus trustStatus, CancellationToken ct)
+    {
+        await RepairShop.Application.Security.AccountTrust.RequireConfirmedEmailAsync(trustUsers, trustStatus, CurrentUser.GetUserId(User), ct); // security audit 2026-11-23 (M-04)
+        return Ok(Envelope.Ok(await _users.InviteAsync(CurrentUser.GetShopId(User), body, CurrentUser.GetActor(User), ct)));
+    }
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = Policies.AdminOnly)]

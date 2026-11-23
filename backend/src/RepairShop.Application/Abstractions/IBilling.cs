@@ -7,6 +7,9 @@ public interface ISubscriptionRepository
     Task<Subscription?> GetByOrganizationAsync(Guid organizationId, CancellationToken ct);
     Task<Subscription?> GetByProviderIdAsync(BillingProvider provider, string providerSubscriptionId, CancellationToken ct);
     Task AddAsync(Subscription subscription, CancellationToken ct);
+
+    /// <summary>Provider subscriptions whose period ends (or ended) between the two instants, or that have no known end.</summary>
+    Task<List<Subscription>> ListForReconciliationAsync(BillingProvider provider, DateTime fromUtc, DateTime toUtc, int take, CancellationToken ct);
 }
 
 /// <summary>Sets up what a brand-new shop needs to work (message templates and other defaults).</summary>

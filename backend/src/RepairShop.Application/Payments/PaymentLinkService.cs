@@ -115,7 +115,14 @@ public sealed class PaymentLinkService
         var integration = await _integrations.GetAsync(shopId, ct);
         if (integration?.MercadoPagoAccessTokenProtected is null) return true; // nothing to do, but don't make MP retry forever
 
-        if (integration.MercadoPagoWebhookSecretProtected is not null)
+        if (integration.MercadoPagoWebhookSecretProtected is null)
+        {
+            // Security audit 2026-11-23 (M-01): integrations enabled before the secret became mandatory still work (the
+            // payment is read back from Mercado Pago with the shop's own token and must carry one of its own links), but
+            // the gap is logged so it can be closed shop by shop.
+            _logger.LogWarning("Unsigned Mercado Pago webhook accepted for shop {ShopId}: the integration has no webhook secret.", shopId);
+        }
+        else
         {
             var secret = _protector.Unprotect(integration.MercadoPagoWebhookSecretProtected);
             if (!MercadoPagoSignature.IsValid(secret, n.Signature, n.RequestId, n.DataId, _clock.UtcNow, TimeSpan.FromMinutes(30)))

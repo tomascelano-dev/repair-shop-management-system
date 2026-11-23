@@ -228,6 +228,8 @@ public sealed class ShopSettingsService
         var branch = await GetShopAsync(branchId, ct);
         if (branch.OrganizationId != current.OrganizationId) throw new ForbiddenException("La sucursal pertenece a otra organización.");
         if (branch.Id == currentShopId && !isActive) throw new DomainException("No podés desactivar la sucursal en la que estás trabajando.");
+        if (branch.Id == branch.OrganizationId && !isActive) throw new DomainException("La sucursal principal de la cuenta no se puede desactivar.");
+        await BranchAuthority.RequireAdminInAsync(_users, _access, actor.UserId, branch.Id, ct);
         if (isActive && !branch.IsActive) await _subscriptions.EnsureBranchCapacityAsync(current.OrganizationId, ct);
         branch.SetActive(isActive, _clock.UtcNow);
         await AuditAsync(currentShopId, isActive ? "branch_activated" : "branch_deactivated", actor, new { branchId }, ct);

@@ -19,7 +19,7 @@ RepairShop centralizes the whole cycle — **intake → diagnosis → quote → 
 - Repair orders with priorities, technicians, promised dates, a Kanban board and an [enforced state machine](backend/docs/workflows/order-state-machine.md): no repair without an approved quote, no "ready" without the exit QA checklist, no delivery with an outstanding balance.
 - Versioned quotes (labor, parts, discounts, warranty, validity) approved or rejected by the customer from the portal; parts are reserved on approval.
 - Payments, deposits, refunds, Mercado Pago payment links, notes (internal or public), photos, message history, warranty certificates and warranty claims.
-- Repair suggestions from similar past orders and, optionally, diagnosis hypotheses from Claude (no personal data is sent).
+- Repair suggestions from similar past orders and, optionally, diagnosis hypotheses from Claude (customer name, phone and email are never sent; emails, long digit runs and unlock codes are stripped from the free text, but other personal details a technician types in the fault description can still reach the model).
 
 **Sales and stock**
 - Point of sale: USB or camera barcode scanning, catalog by category, free items, line and global discounts, split payments with change, held sales, keyboard shortcuts, tickets and invoices.

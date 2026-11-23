@@ -29,18 +29,22 @@ public sealed class ExchangeRateService
         _logger = logger;
     }
 
-    public async Task<List<ExchangeRateResponse>> ListRecentAsync(int take, CancellationToken ct)
-        => (await _rates.ListRecentAsync(take, ct)).Select(ToResponse).ToList();
+    public async Task<List<ExchangeRateResponse>> ListRecentAsync(Guid organizationId, int take, CancellationToken ct)
+        => (await _rates.ListRecentAsync(organizationId, take, ct)).Select(ToResponse).ToList();
 
-    public async Task<ExchangeRateResponse> SetAsync(SetExchangeRateRequest req, CancellationToken ct)
+    /// <summary>A rate typed by a shop: it belongs to its organization and only changes its own reports.</summary>
+    public Task<ExchangeRateResponse> SetForOrganizationAsync(Guid organizationId, SetExchangeRateRequest req, CancellationToken ct)
+        => SetAsync(organizationId, req, ct);
+
+    private async Task<ExchangeRateResponse> SetAsync(Guid? organizationId, SetExchangeRateRequest req, CancellationToken ct)
     {
         var baseCur = Money.NormalizeCurrency(req.BaseCurrency);
         var quoteCur = Money.NormalizeCurrency(req.QuoteCurrency);
         var source = ExchangeRate.NormalizeSource(req.Source);
-        var existing = await _rates.GetAsync(req.Date, baseCur, quoteCur, source, ct);
+        var existing = await _rates.GetAsync(organizationId, req.Date, baseCur, quoteCur, source, ct);
         if (existing is null)
         {
-            existing = new ExchangeRate(req.Date, baseCur, quoteCur, source, req.Rate, _clock.UtcNow);
+            existing = new ExchangeRate(req.Date, baseCur, quoteCur, source, req.Rate, _clock.UtcNow, organizationId);
             await _rates.AddAsync(existing, ct);
         }
         else
@@ -67,27 +71,34 @@ public sealed class ExchangeRateService
         }
 
         foreach (var r in fetched)
-            await SetAsync(new SetExchangeRateRequest(r.Date, r.Rate, r.BaseCurrency, r.QuoteCurrency, r.Source), ct);
+            await SetAsync(null, new SetExchangeRateRequest(r.Date, r.Rate, r.BaseCurrency, r.QuoteCurrency, r.Source), ct);
         return fetched.Count;
     }
 
-    public CurrencyConverter CreateConverter(string targetCurrency) => new(this, Money.NormalizeCurrency(targetCurrency));
+    /// <summary>Converter for one organization: its own rates first, then the global ones.</summary>
+    public CurrencyConverter CreateConverter(string targetCurrency, Guid organizationId) => new(this, Money.NormalizeCurrency(targetCurrency), organizationId);
 
-    internal async Task<(decimal Rate, string Source)?> FindRateAsync(DateOnly date, string from, string to, CancellationToken ct)
+    internal async Task<(decimal Rate, string Source)?> FindRateAsync(Guid organizationId, DateOnly date, string from, string to, CancellationToken ct)
     {
+        var scopes = new Guid?[] { organizationId, null };
         foreach (var source in SourcePreference)
-        {
-            var direct = await _rates.GetLatestOnOrBeforeAsync(date, from, to, source, ct);
-            if (direct is not null) return (direct.Rate, direct.Source);
-            var inverse = await _rates.GetLatestOnOrBeforeAsync(date, to, from, source, ct);
-            if (inverse is not null) return (1m / inverse.Rate, inverse.Source);
-        }
+            foreach (var scope in scopes)
+            {
+                var direct = await _rates.GetLatestOnOrBeforeAsync(scope, date, from, to, source, ct);
+                if (direct is not null) return (direct.Rate, direct.Source);
+                var inverse = await _rates.GetLatestOnOrBeforeAsync(scope, date, to, from, source, ct);
+                if (inverse is not null) return (1m / inverse.Rate, inverse.Source);
+            }
 
         // Any source as a last resort.
-        var any = await _rates.GetLatestOnOrBeforeAsync(date, from, to, null, ct);
-        if (any is not null) return (any.Rate, any.Source);
-        var anyInverse = await _rates.GetLatestOnOrBeforeAsync(date, to, from, null, ct);
-        return anyInverse is null ? null : (1m / anyInverse.Rate, anyInverse.Source);
+        foreach (var scope in scopes)
+        {
+            var any = await _rates.GetLatestOnOrBeforeAsync(scope, date, from, to, null, ct);
+            if (any is not null) return (any.Rate, any.Source);
+            var anyInverse = await _rates.GetLatestOnOrBeforeAsync(scope, date, to, from, null, ct);
+            if (anyInverse is not null) return (1m / anyInverse.Rate, anyInverse.Source);
+        }
+        return null;
     }
 
     private static ExchangeRateResponse ToResponse(ExchangeRate r)
@@ -98,12 +109,14 @@ public sealed class ExchangeRateService
 public sealed class CurrencyConverter
 {
     private readonly ExchangeRateService _service;
+    private readonly Guid _organizationId;
     private readonly Dictionary<(DateOnly, string), (decimal Rate, string Source)?> _cache = new();
 
-    internal CurrencyConverter(ExchangeRateService service, string target)
+    internal CurrencyConverter(ExchangeRateService service, string target, Guid organizationId)
     {
         _service = service;
         Target = target;
+        _organizationId = organizationId;
     }
 
     public string Target { get; }
@@ -117,7 +130,7 @@ public sealed class CurrencyConverter
         var date = DateOnly.FromDateTime(atUtc);
         if (!_cache.TryGetValue((date, currency), out var rate))
         {
-            rate = await _service.FindRateAsync(date, currency, Target, ct);
+            rate = await _service.FindRateAsync(_organizationId, date, currency, Target, ct);
             _cache[(date, currency)] = rate;
         }
 

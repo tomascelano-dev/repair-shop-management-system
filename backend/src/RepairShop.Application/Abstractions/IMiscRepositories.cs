@@ -13,12 +13,14 @@ public interface IStoredFileRepository
 
 public interface IExchangeRateRepository
 {
-    Task<ExchangeRate?> GetAsync(DateOnly date, string baseCurrency, string quoteCurrency, string source, CancellationToken ct);
+    /// <summary>The row of exactly that scope: <paramref name="organizationId"/> null = global (platform) rate.</summary>
+    Task<ExchangeRate?> GetAsync(Guid? organizationId, DateOnly date, string baseCurrency, string quoteCurrency, string source, CancellationToken ct);
 
-    /// <summary>Latest rate on or before the date (any source if null).</summary>
-    Task<ExchangeRate?> GetLatestOnOrBeforeAsync(DateOnly date, string baseCurrency, string quoteCurrency, string? source, CancellationToken ct);
+    /// <summary>Latest rate of exactly that scope on or before the date (any source if null).</summary>
+    Task<ExchangeRate?> GetLatestOnOrBeforeAsync(Guid? organizationId, DateOnly date, string baseCurrency, string quoteCurrency, string? source, CancellationToken ct);
 
-    Task<List<ExchangeRate>> ListRecentAsync(int take, CancellationToken ct);
+    /// <summary>Global rates plus the organization's own.</summary>
+    Task<List<ExchangeRate>> ListRecentAsync(Guid organizationId, int take, CancellationToken ct);
     Task<List<ExchangeRate>> ListRangeAsync(DateOnly from, DateOnly to, string baseCurrency, string quoteCurrency, CancellationToken ct);
     Task AddAsync(ExchangeRate rate, CancellationToken ct);
 }

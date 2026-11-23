@@ -156,7 +156,23 @@ public sealed class ApiClient
     }
 
     /// <summary>Signs up a brand-new shop from the website and returns a client logged in as its owner.</summary>
-    public static async Task<(ApiClient Client, JsonElement Login)> SignupAsync(ApiFactory factory, string country = "AR", string? email = null, object? attribution = null)
+    public static async Task<(ApiClient Client, JsonElement Login)> SignupAsync(ApiFactory factory, string country = "AR", string? email = null, object? attribution = null, bool confirmEmail = true)
+    {
+        var result = await SignupUnconfirmedAsync(factory, country, email, attribution);
+        if (confirmEmail)
+        {
+            // Security audit 2026-11-23: inviting users, integrations and customer messages need a confirmed email when the
+            // platform can send mail (tests use the simulated provider). Most tests act as an owner who already confirmed.
+            await using var conn = new NpgsqlConnection(factory.ConnectionString);
+            await conn.OpenAsync();
+            await using var cmd = new NpgsqlCommand("UPDATE users SET \"EmailVerifiedAtUtc\" = now() WHERE \"Id\" = @id", conn);
+            cmd.Parameters.AddWithValue("id", Guid.Parse(result.Login.GetProperty("user").Str("id")));
+            await cmd.ExecuteNonQueryAsync();
+        }
+        return result;
+    }
+
+    private static async Task<(ApiClient Client, JsonElement Login)> SignupUnconfirmedAsync(ApiFactory factory, string country, string? email, object? attribution)
     {
         var http = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true, BaseAddress = new Uri("http://localhost") });
         http.DefaultRequestHeaders.Add("X-RS-Refresh", "1");

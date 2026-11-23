@@ -32,6 +32,9 @@ public sealed class Subscription
     /// <summary>Days of full access after a missed renewal before the account becomes read-only.</summary>
     public static readonly TimeSpan GracePeriod = TimeSpan.FromDays(5);
 
+    /// <summary>Days a paid period lasts when the provider did not report its end.</summary>
+    public const int MissingPeriodDays = 31;
+
     public Guid Id { get; private set; } = Guid.NewGuid();
     public Guid OrganizationId { get; private set; }
 
@@ -100,10 +103,15 @@ public sealed class Subscription
             case SubscriptionStatus.Trialing:
                 return nowUtc < TrialEndsAtUtc ? SubscriptionStatus.Trialing : SubscriptionStatus.Expired;
             case SubscriptionStatus.Active:
-                if (Provider == BillingProvider.Manual || CurrentPeriodEndsAtUtc is null) return SubscriptionStatus.Active;
-                if (nowUtc < CurrentPeriodEndsAtUtc) return SubscriptionStatus.Active;
+                if (Provider == BillingProvider.Manual) return SubscriptionStatus.Active;
+                // Security audit 2026-11-23 (A-02): a Mercado Pago subscription without a known period end (no next payment
+                // date in the preapproval) no longer stays active forever: one month from its last update, then grace.
+                // Other providers (legacy rows) keep the old rule.
+                if (CurrentPeriodEndsAtUtc is null && Provider != BillingProvider.MercadoPago) return SubscriptionStatus.Active;
+                var periodEnd = CurrentPeriodEndsAtUtc ?? (LastEventAtUtc ?? UpdatedAtUtc).AddDays(MissingPeriodDays);
+                if (nowUtc < periodEnd) return SubscriptionStatus.Active;
                 // Renewal not confirmed yet (webhook late or payment retrying): grace period, then read-only.
-                return nowUtc < CurrentPeriodEndsAtUtc + GracePeriod ? SubscriptionStatus.PastDue : SubscriptionStatus.Expired;
+                return nowUtc < periodEnd + GracePeriod ? SubscriptionStatus.PastDue : SubscriptionStatus.Expired;
             case SubscriptionStatus.PastDue:
                 var since = CurrentPeriodEndsAtUtc ?? UpdatedAtUtc;
                 return nowUtc < since + GracePeriod ? SubscriptionStatus.PastDue : SubscriptionStatus.Expired;

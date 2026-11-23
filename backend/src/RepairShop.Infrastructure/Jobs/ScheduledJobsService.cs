@@ -20,6 +20,7 @@ public sealed class JobsOptions
     public int QuoteExpiryIntervalMinutes { get; set; } = 30;
     public int ExchangeRatesIntervalMinutes { get; set; } = 360;
     public int CleanupIntervalMinutes { get; set; } = 720;
+    public int BillingReconcileIntervalMinutes { get; set; } = 720;
 }
 
 /// <summary>
@@ -56,6 +57,8 @@ public sealed class ScheduledJobsService : BackgroundService
             await RunIfDueAsync("orders.feedback_surveys", _opt.RemindersIntervalMinutes, sp => sp.GetRequiredService<ReminderService>().SendFeedbackSurveysAsync(stoppingToken), stoppingToken);
             await RunIfDueAsync("currency.refresh", _opt.ExchangeRatesIntervalMinutes, sp => sp.GetRequiredService<ExchangeRateService>().RefreshFromProviderAsync(stoppingToken), stoppingToken);
             await RunIfDueAsync("maintenance.cleanup", _opt.CleanupIntervalMinutes, sp => CleanupAsync(sp, stoppingToken), stoppingToken);
+            // Security audit 2026-11-23 (M-05): subscriptions near the end of their period are read back from Mercado Pago.
+            await RunIfDueAsync("billing.reconcile", _opt.BillingReconcileIntervalMinutes, sp => sp.GetRequiredService<Application.Billing.SubscriptionService>().ReconcileMercadoPagoAsync(stoppingToken), stoppingToken);
 
             try { await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken); }
             catch (OperationCanceledException) { break; }

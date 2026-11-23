@@ -104,9 +104,12 @@ public sealed class UserAdminService
         }
         else
         {
+            // From a branch that is not the user's home, an admin only manages the role in this branch: the name and
+            // the account itself (active or not, for every branch) belong to the admins of the home branch.
+            if (user.IsActive != req.IsActive)
+                throw new ForbiddenException("Solo se puede activar o desactivar un usuario desde su sucursal principal.");
             var access = await _access.GetAsync(user.Id, shopId, ct) ?? throw new NotFoundException("Usuario no encontrado.");
             access.ChangeRole(req.Role);
-            user.UpdateProfile(req.DisplayName, user.Role, now);
             user.RotateSecurityStamp(now);
         }
 
@@ -126,6 +129,9 @@ public sealed class UserAdminService
     {
         var now = _clock.UtcNow;
         var user = await GetManagedUserAsync(shopId, userId, ct);
+        // The link opens the whole account (every branch): only the admins of the user's home branch can create it.
+        if (user.ShopId != shopId)
+            throw new ForbiddenException("El link de acceso se genera desde la sucursal principal del usuario.");
         if (!user.IsActive) throw new DomainException("El usuario está desactivado.");
 
         var raw = TokenHasher.NewToken();
@@ -150,6 +156,7 @@ public sealed class UserAdminService
         var target = await _shops.GetByIdAsync(req.ShopId, ct) ?? throw new NotFoundException("Sucursal no encontrada.");
         if (target.OrganizationId != current.OrganizationId) throw new ForbiddenException("La sucursal pertenece a otra organización.");
         if (target.Id == user.ShopId) throw new DomainException("Esa es la sucursal principal del usuario.");
+        await RequireAdminInAsync(actor, target.Id, ct);
 
         var existing = await _access.GetAsync(user.Id, target.Id, ct);
         if (existing is null) await _access.AddAsync(new UserShopAccess(user.Id, target.Id, req.Role, now), ct);
@@ -165,6 +172,7 @@ public sealed class UserAdminService
     {
         var now = _clock.UtcNow;
         var user = await GetManagedUserAsync(currentShopId, userId, ct);
+        await RequireAdminInAsync(actor, shopId, ct);
         var access = await _access.GetAsync(user.Id, shopId, ct) ?? throw new NotFoundException("El usuario no tiene acceso a esa sucursal.");
         _access.Remove(access);
         user.RotateSecurityStamp(now);
@@ -180,6 +188,9 @@ public sealed class UserAdminService
             throw new NotFoundException("Usuario no encontrado.");
         return user;
     }
+
+    private Task RequireAdminInAsync(Actor actor, Guid shopId, CancellationToken ct)
+        => BranchAuthority.RequireAdminInAsync(_users, _access, actor.UserId, shopId, ct);
 
     private async Task<UserRole> GetRoleInShopAsync(AppUser user, Guid shopId, CancellationToken ct)
         => user.ShopId == shopId ? user.Role : (await _access.GetAsync(user.Id, shopId, ct))?.Role ?? user.Role;

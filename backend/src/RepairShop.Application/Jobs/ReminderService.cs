@@ -19,6 +19,8 @@ public sealed class ReminderService
     private readonly NotificationService _notifications;
     private readonly IDateTimeProvider _clock;
     private readonly ILogger<ReminderService> _logger;
+    private readonly Billing.SubscriptionService _subscriptions;
+    private readonly Dictionary<Guid, bool> _access = new();
 
     public ReminderService(
         IRepairOrderRepository orders,
@@ -26,8 +28,10 @@ public sealed class ReminderService
         ICustomerFeedbackRepository feedback,
         NotificationService notifications,
         IDateTimeProvider clock,
-        ILogger<ReminderService> logger)
+        ILogger<ReminderService> logger,
+        Billing.SubscriptionService subscriptions)
     {
+        _subscriptions = subscriptions;
         _orders = orders;
         _shops = shops;
         _feedback = feedback;
@@ -46,7 +50,7 @@ public sealed class ReminderService
         foreach (var order in candidates)
         {
             var shop = await _shops.GetByIdAsync(order.ShopId, ct);
-            if (shop is null || !shop.NotificationsEnabled || order.ReadyAtUtc is null) continue;
+            if (shop is null || !shop.NotificationsEnabled || order.ReadyAtUtc is null || !await HasFullAccessAsync(shop.OrganizationId, ct)) continue;
 
             // Only the most recent reminder that is due (never several at once).
             var due = shop.GetReadyReminderDays().Where(d => order.ReadyAtUtc.Value.AddDays(d) <= now).DefaultIfEmpty(0).Max();
@@ -77,7 +81,7 @@ public sealed class ReminderService
         foreach (var order in candidates)
         {
             var shop = await _shops.GetByIdAsync(order.ShopId, ct);
-            if (shop is null || !shop.NotificationsEnabled || !shop.SendFeedbackSurvey || order.IsWarrantyClaim) continue;
+            if (shop is null || !shop.NotificationsEnabled || !shop.SendFeedbackSurvey || order.IsWarrantyClaim || !await HasFullAccessAsync(shop.OrganizationId, ct)) continue;
             if (await _feedback.GetByOrderAsync(order.ShopId, order.Id, ct) is not null) continue;
 
             try
@@ -93,5 +97,14 @@ public sealed class ReminderService
         }
 
         return sent;
+    }
+
+    // Security audit 2026-11-23 (B-01): an expired account (read-only) no longer sends automatic messages through the
+    // platform's sender. Cached per run: one lookup per organization.
+    private async Task<bool> HasFullAccessAsync(Guid organizationId, CancellationToken ct)
+    {
+        if (!_access.TryGetValue(organizationId, out var full))
+            _access[organizationId] = full = (await _subscriptions.GetAccessAsync(organizationId, ct)).HasFullAccess;
+        return full;
     }
 }

@@ -46,7 +46,9 @@ public static class DbSeeder
             {
                 var exists = await db.Users.IgnoreQueryFilters().AnyAsync(x => x.Email == u.Email, ct);
                 if (exists) continue;
-                await db.Users.AddAsync(new AppUser(shop.Id, u.Email, u.DisplayName, u.Role, hasher.Hash(u.Password), now), ct);
+                var dev = new AppUser(shop.Id, u.Email, u.DisplayName, u.Role, hasher.Hash(u.Password), now);
+                dev.MarkEmailVerified(now); // development users only (local addresses nobody can confirm)
+                await db.Users.AddAsync(dev, ct);
             }
             await db.SaveChangesAsync(ct);
         }

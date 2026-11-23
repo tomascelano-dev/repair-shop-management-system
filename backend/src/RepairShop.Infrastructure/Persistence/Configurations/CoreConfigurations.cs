@@ -163,7 +163,8 @@ internal sealed class ExchangeRateConfiguration : IEntityTypeConfiguration<Excha
         b.Property(x => x.QuoteCurrency).HasMaxLength(3).IsRequired();
         b.Property(x => x.Source).HasMaxLength(30).IsRequired();
         b.Property(x => x.Rate).HasColumnType("numeric(18,6)");
-        b.HasIndex(x => new { x.Date, x.BaseCurrency, x.QuoteCurrency, x.Source }).IsUnique();
+        // One row per organization (null = global rate fetched by the platform) and day/pair/source.
+        b.HasIndex(x => new { x.OrganizationId, x.Date, x.BaseCurrency, x.QuoteCurrency, x.Source }).IsUnique().AreNullsDistinct(false);
     }
 }
 

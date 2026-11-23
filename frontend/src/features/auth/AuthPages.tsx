@@ -211,7 +211,7 @@ function PasswordForm({ submitLabel, onSubmit, withName }: { submitLabel: string
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
       ) : null}
-      <Field label="Nueva contraseña" hint="Mínimo 8 caracteres, con letras y números.">
+      <Field label="Nueva contraseña" hint="Mínimo 10 caracteres, con letras y números.">
         <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </Field>
       <Field label="Repetir contraseña">

@@ -77,6 +77,9 @@ public sealed class NotificationDispatcher
             }
         }
 
+        foreach (var item in items.Where(x => x.RelatedEntityType == Repositories.NotificationOutboxRepository.AccountEntityType))
+            item.RedactBody(_clock.UtcNow);
+
         await _db.SaveChangesAsync(ct);
         return items.Count;
     }

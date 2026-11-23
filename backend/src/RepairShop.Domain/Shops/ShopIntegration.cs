@@ -44,6 +44,8 @@ public sealed class ShopIntegration
         if (accessTokenProtected is not null) MercadoPagoAccessTokenProtected = accessTokenProtected.Length == 0 ? null : accessTokenProtected;
         if (webhookSecretProtected is not null) MercadoPagoWebhookSecretProtected = webhookSecretProtected.Length == 0 ? null : webhookSecretProtected;
         if (enabled && MercadoPagoAccessTokenProtected is null) throw new DomainException("Para habilitar Mercado Pago cargá el access token.");
+        // Security audit 2026-11-23 (M-01): without the secret nobody can tell a notification from Mercado Pago from a forged one.
+        if (enabled && MercadoPagoWebhookSecretProtected is null) throw new DomainException("Para habilitar Mercado Pago cargá también la clave secreta de las notificaciones (Webhooks en tu panel de Mercado Pago).");
         MercadoPagoEnabled = enabled;
         UpdatedAtUtc = nowUtc;
     }

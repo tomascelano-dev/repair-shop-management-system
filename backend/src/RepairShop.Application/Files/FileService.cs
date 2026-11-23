@@ -94,6 +94,8 @@ public sealed class FileService
         if (imagesOnly && !isImage) throw new DomainException("Solo se permiten imágenes.");
         if (bytes.Length > (isImage ? MaxImageBytes : MaxDocumentBytes))
             throw new DomainException($"El archivo supera el máximo permitido ({(isImage ? MaxImageBytes : MaxDocumentBytes) / 1024 / 1024} MB).");
+        if (isImage && !ImageDimensions.IsAcceptable(bytes))
+            throw new DomainException("La imagen tiene demasiados píxeles. Achicala (por ejemplo a 4000×4000) y volvé a subirla.");
 
         var now = _clock.UtcNow;
         var id = Guid.NewGuid();

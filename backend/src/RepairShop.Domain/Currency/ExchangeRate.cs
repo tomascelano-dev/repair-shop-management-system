@@ -4,11 +4,13 @@ namespace RepairShop.Domain.Currency;
 
 /// <summary>
 /// Daily exchange rate (e.g. 1 USD = 1400.50 ARS). Source: "oficial", "blue", "manual"...
-/// Global (not per shop).
+/// Rates fetched by the platform job are global (<see cref="OrganizationId"/> null); rates a shop types belong to its
+/// organization and only affect its own reports.
 /// </summary>
 public sealed class ExchangeRate
 {
     public Guid Id { get; private set; } = Guid.NewGuid();
+    public Guid? OrganizationId { get; private set; }
     public DateOnly Date { get; private set; }
     public string BaseCurrency { get; private set; } = null!;
     public string QuoteCurrency { get; private set; } = null!;
@@ -19,9 +21,10 @@ public sealed class ExchangeRate
 
     private ExchangeRate() { }
 
-    public ExchangeRate(DateOnly date, string baseCurrency, string quoteCurrency, string source, decimal rate, DateTime nowUtc)
+    public ExchangeRate(DateOnly date, string baseCurrency, string quoteCurrency, string source, decimal rate, DateTime nowUtc, Guid? organizationId = null)
     {
         if (rate <= 0) throw new DomainException("La cotización debe ser mayor a 0.");
+        OrganizationId = organizationId;
         Date = date;
         BaseCurrency = Money.NormalizeCurrency(baseCurrency);
         QuoteCurrency = Money.NormalizeCurrency(quoteCurrency);

@@ -52,12 +52,24 @@ public sealed class LoginSecurityService
         }
     }
 
-    public void EnsureNotLocked(string email)
-    {
-        var normalized = NormalizeEmail(email);
-        var key = $"login:lock:email:{normalized}";
-        var now = DateTimeOffset.UtcNow;
+    // Security audit 2026-11-23 (M-09): the lockout used to key on the email alone, so anybody who knew an owner's address
+    // could keep them out with 5 wrong passwords every 10 minutes. Now the normal lockout keys on email + client IP, and
+    // the email alone is only locked after many more failures (a distributed guessing attack), which no single
+    // address can trigger by itself.
+    public const int EmailWideFactor = 10;
 
+    private static string PairKey(string email, string? ip) => $"login:lock:pair:{NormalizeEmail(email)}|{NormalizeIp(ip ?? "")}";
+    private static string EmailKey(string email) => $"login:lock:email:{NormalizeEmail(email)}";
+
+    public void EnsureNotLocked(string email, string? ip)
+    {
+        Ensure(PairKey(email, ip));
+        Ensure(EmailKey(email));
+    }
+
+    private void Ensure(string key)
+    {
+        var now = DateTimeOffset.UtcNow;
         if (_cache.TryGetValue(key, out LockoutEntry entry) && entry.LockedUntilUtc is not null)
         {
             var until = entry.LockedUntilUtc.Value;
@@ -72,21 +84,26 @@ public sealed class LoginSecurityService
         }
     }
 
-    public void RegisterSuccess(string email)
+    public void RegisterSuccess(string email, string? ip)
     {
-        var key = $"login:lock:email:{NormalizeEmail(email)}";
-        _cache.Remove(key);
+        _cache.Remove(PairKey(email, ip));
     }
 
-    public void RegisterFailure(string email)
+    public void RegisterFailure(string email, string? ip)
+    {
+        var opt = _options.CurrentValue.Lockout;
+        var maxAttempts = Math.Max(1, opt.MaxFailedAttempts);
+        RegisterFailure(PairKey(email, ip), maxAttempts);
+        RegisterFailure(EmailKey(email), maxAttempts * EmailWideFactor);
+    }
+
+    private void RegisterFailure(string key, int maxAttempts)
     {
         var opt = _options.CurrentValue.Lockout;
 
-        var maxAttempts = Math.Max(1, opt.MaxFailedAttempts);
         var cooldownSeconds = Math.Max(10, opt.CooldownSeconds);
         var resetSeconds = Math.Max(60, opt.FailureResetSeconds);
 
-        var key = $"login:lock:email:{NormalizeEmail(email)}";
         var now = DateTimeOffset.UtcNow;
 
         LockoutEntry entry;

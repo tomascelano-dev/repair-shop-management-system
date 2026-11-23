@@ -86,7 +86,7 @@ export function SignupPage() {
         <Field label="Email" error={errors.email}>
           <Input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} autoComplete="email" required />
         </Field>
-        <Field label={en ? "Password" : "Contraseña"} hint={en ? "At least 8 characters, including letters and numbers." : "Mínimo 8 caracteres, con letras y números."} error={errors.password}>
+        <Field label={en ? "Password" : "Contraseña"} hint={en ? "At least 10 characters, including letters and numbers." : "Mínimo 10 caracteres, con letras y números."} error={errors.password}>
           <Input type="password" value={form.password} onChange={(e) => set('password', e.target.value)} autoComplete="new-password" required />
         </Field>
         <Field

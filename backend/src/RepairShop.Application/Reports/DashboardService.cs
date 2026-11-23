@@ -36,7 +36,7 @@ public sealed class DashboardService
         var total = counts.Values.Sum();
         var open = total - Count(RepairOrderStatus.Delivered) - Count(RepairOrderStatus.Cancelled);
 
-        var converter = _rates.CreateConverter(shop.ReportingCurrency);
+        var converter = _rates.CreateConverter(shop.ReportingCurrency, shop.OrganizationId);
         var monthMoves = await _queries.MoneyMovementsAsync(shopId, monthStart, now, ct);
         var today = await SummarizeAsync(monthMoves.Where(m => m.AtUtc >= todayStart).ToList(), converter, ct);
         var month = await SummarizeAsync(monthMoves, converter, ct);
@@ -76,7 +76,7 @@ public sealed class DashboardService
         var fromUtc = TimeZoneInfo.ConvertTimeToUtc(firstDay.ToDateTime(TimeOnly.MinValue), tz);
 
         var moves = await _queries.MoneyMovementsAsync(shopId, fromUtc, now, ct);
-        var converter = _rates.CreateConverter(shop.ReportingCurrency);
+        var converter = _rates.CreateConverter(shop.ReportingCurrency, shop.OrganizationId);
         var byDay = moves.GroupBy(m => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(m.AtUtc, tz))).ToDictionary(g => g.Key, g => g.ToList());
 
         var points = new List<RevenuePoint>();
@@ -90,10 +90,10 @@ public sealed class DashboardService
         return points;
     }
 
-    public async Task<ConsolidatedDashboardResponse> GetConsolidatedAsync(IReadOnlyList<(Guid ShopId, string Name)> shops, string reportingCurrency, CancellationToken ct)
+    public async Task<ConsolidatedDashboardResponse> GetConsolidatedAsync(IReadOnlyList<(Guid ShopId, string Name)> shops, string reportingCurrency, Guid organizationId, CancellationToken ct)
     {
         var now = _clock.UtcNow;
-        var converter = _rates.CreateConverter(reportingCurrency);
+        var converter = _rates.CreateConverter(reportingCurrency, organizationId);
         var rows = new List<ConsolidatedBranchSummary>();
         decimal? total = 0;
         foreach (var (shopId, name) in shops)

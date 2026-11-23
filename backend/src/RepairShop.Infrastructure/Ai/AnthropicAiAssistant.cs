@@ -202,6 +202,7 @@ public sealed class AnthropicAiAssistant : IAiAssistant
 
     private static readonly Regex Email = new(@"[\w.+-]+@[\w-]+(\.[\w-]+)+", RegexOptions.Compiled);
     private static readonly Regex LongDigits = new(@"\+?\d[\d\s().-]{5,}\d", RegexOptions.Compiled);
+    private static readonly Regex Secret = new(@"(?i)\b(pin|clave|contrase[ñn]a|patr[oó]n|c[oó]digo de desbloqueo|password|pass|passcode)\b\s*[:=]?\s*\S+", RegexOptions.Compiled);
 
     /// <summary>Removes contact data and identifiers (emails, phones, IMEI/DNI-like numbers).</summary>
     internal static string Sanitize(string? text)
@@ -209,6 +210,8 @@ public sealed class AnthropicAiAssistant : IAiAssistant
         if (string.IsNullOrWhiteSpace(text)) return "";
         var value = Email.Replace(text, "[email]");
         value = LongDigits.Replace(value, match => match.Value.Count(char.IsDigit) >= 7 ? "[número]" : match.Value);
+        // Security audit 2026-11-23 (B-06): unlock codes technicians write in the notes ("pin 1234", "patrón: L", "clave=...").
+        value = Secret.Replace(value, match => match.Groups[1].Value + " [omitido]");
         value = value.Replace('\r', ' ').Replace('\n', ' ').Trim();
         return value.Length > 1000 ? value[..1000] : value;
     }

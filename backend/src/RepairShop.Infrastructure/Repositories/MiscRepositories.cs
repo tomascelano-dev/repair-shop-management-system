@@ -29,21 +29,28 @@ public sealed class ExchangeRateRepository : IExchangeRateRepository
     private readonly RepairShopDbContext _db;
     public ExchangeRateRepository(RepairShopDbContext db) => _db = db;
 
-    public Task<ExchangeRate?> GetAsync(DateOnly date, string baseCurrency, string quoteCurrency, string source, CancellationToken ct)
-        => _db.ExchangeRates.FirstOrDefaultAsync(x => x.Date == date && x.BaseCurrency == baseCurrency && x.QuoteCurrency == quoteCurrency && x.Source == source, ct);
+    public Task<ExchangeRate?> GetAsync(Guid? organizationId, DateOnly date, string baseCurrency, string quoteCurrency, string source, CancellationToken ct)
+        => _db.ExchangeRates.FirstOrDefaultAsync(x => x.OrganizationId == organizationId && x.Date == date && x.BaseCurrency == baseCurrency && x.QuoteCurrency == quoteCurrency && x.Source == source, ct);
 
-    public Task<ExchangeRate?> GetLatestOnOrBeforeAsync(DateOnly date, string baseCurrency, string quoteCurrency, string? source, CancellationToken ct)
+    /// <summary>Global rows with source "manual" were typed by some shop before rates were scoped per organization
+    /// (anyone could write them): they are kept for the record but no longer count for anybody.</summary>
+    private const string LegacyGlobalManual = "manual";
+
+    public Task<ExchangeRate?> GetLatestOnOrBeforeAsync(Guid? organizationId, DateOnly date, string baseCurrency, string quoteCurrency, string? source, CancellationToken ct)
         => _db.ExchangeRates
-            .Where(x => x.Date <= date && x.BaseCurrency == baseCurrency && x.QuoteCurrency == quoteCurrency && (source == null || x.Source == source))
+            .Where(x => x.OrganizationId == organizationId && x.Date <= date && x.BaseCurrency == baseCurrency && x.QuoteCurrency == quoteCurrency && (source == null || x.Source == source))
+            .Where(x => x.OrganizationId != null || x.Source != LegacyGlobalManual)
             .OrderByDescending(x => x.Date).ThenByDescending(x => x.UpdatedAtUtc)
             .FirstOrDefaultAsync(ct);
 
-    public Task<List<ExchangeRate>> ListRecentAsync(int take, CancellationToken ct)
-        => _db.ExchangeRates.OrderByDescending(x => x.Date).ThenBy(x => x.Source).Take(Math.Clamp(take, 1, 200)).ToListAsync(ct);
+    public Task<List<ExchangeRate>> ListRecentAsync(Guid organizationId, int take, CancellationToken ct)
+        => _db.ExchangeRates
+            .Where(x => (x.OrganizationId == null && x.Source != LegacyGlobalManual) || x.OrganizationId == organizationId)
+            .OrderByDescending(x => x.Date).ThenBy(x => x.Source).Take(Math.Clamp(take, 1, 200)).ToListAsync(ct);
 
     public Task<List<ExchangeRate>> ListRangeAsync(DateOnly from, DateOnly to, string baseCurrency, string quoteCurrency, CancellationToken ct)
         => _db.ExchangeRates
-            .Where(x => x.Date >= from && x.Date <= to && x.BaseCurrency == baseCurrency && x.QuoteCurrency == quoteCurrency)
+            .Where(x => x.OrganizationId == null && x.Source != LegacyGlobalManual && x.Date >= from && x.Date <= to && x.BaseCurrency == baseCurrency && x.QuoteCurrency == quoteCurrency)
             .OrderBy(x => x.Date)
             .ToListAsync(ct);
 
@@ -121,22 +128,29 @@ public sealed class NotificationOutboxRepository : INotificationOutboxRepository
     public Task AddAsync(NotificationOutboxItem item, CancellationToken ct)
         => _db.NotificationOutbox.AddAsync(item, ct).AsTask();
 
+    /// <summary>Account messages (password reset, invitation, e-mail verification) carry a one-time link: they never reach
+    /// the shop's message tray, where any staff member with OrdersWork could read them and take over the account.</summary>
+    public const string AccountEntityType = "user";
+
     public Task<NotificationOutboxItem?> GetByIdAsync(Guid shopId, Guid id, CancellationToken ct)
-        => _db.NotificationOutbox.FirstOrDefaultAsync(x => x.ShopId == shopId && x.Id == id, ct);
+        => _db.NotificationOutbox.FirstOrDefaultAsync(x => x.ShopId == shopId && x.Id == id && x.RelatedEntityType != AccountEntityType, ct);
+
+    public Task<int> CountQueuedByStaffSinceAsync(Guid shopId, DateTime sinceUtc, CancellationToken ct)
+        => _db.NotificationOutbox.IgnoreQueryFilters().CountAsync(x => x.ShopId == shopId && x.CreatedByUserId != null && x.CreatedAtUtc >= sinceUtc, ct);
 
     public Task<bool> ExistsAsync(Guid shopId, string correlationKey, CancellationToken ct)
         => _db.NotificationOutbox.IgnoreQueryFilters().AnyAsync(x => x.ShopId == shopId && x.CorrelationKey == correlationKey, ct);
 
     public Task<List<NotificationOutboxItem>> ListAsync(Guid shopId, int skip, int take, CancellationToken ct)
         => _db.NotificationOutbox
-            .Where(x => x.ShopId == shopId)
+            .Where(x => x.ShopId == shopId && x.RelatedEntityType != AccountEntityType)
             .OrderByDescending(x => x.CreatedAtUtc)
             .Skip(skip).Take(take)
             .ToListAsync(ct);
 
     public async Task<(List<NotificationOutboxItem> Items, int Total)> SearchAsync(Guid shopId, OutboxStatus? status, string? relatedEntityType, Guid? relatedEntityId, int skip, int take, CancellationToken ct)
     {
-        var q = _db.NotificationOutbox.Where(x => x.ShopId == shopId);
+        var q = _db.NotificationOutbox.Where(x => x.ShopId == shopId && x.RelatedEntityType != AccountEntityType);
         if (status is not null) q = q.Where(x => x.Status == status);
         if (!string.IsNullOrWhiteSpace(relatedEntityType)) q = q.Where(x => x.RelatedEntityType == relatedEntityType);
         if (relatedEntityId is not null) q = q.Where(x => x.RelatedEntityId == relatedEntityId);

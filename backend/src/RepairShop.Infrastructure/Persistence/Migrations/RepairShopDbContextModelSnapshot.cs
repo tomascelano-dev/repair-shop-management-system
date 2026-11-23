@@ -495,6 +495,9 @@ namespace RepairShop.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
 
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("QuoteCurrency")
                         .IsRequired()
                         .HasMaxLength(3)
@@ -513,8 +516,10 @@ namespace RepairShop.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Date", "BaseCurrency", "QuoteCurrency", "Source")
+                    b.HasIndex("OrganizationId", "Date", "BaseCurrency", "QuoteCurrency", "Source")
                         .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("OrganizationId", "Date", "BaseCurrency", "QuoteCurrency", "Source"), false);
 
                     b.ToTable("exchange_rates", (string)null);
                 });

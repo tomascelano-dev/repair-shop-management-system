@@ -174,7 +174,15 @@ public sealed class OrdersController : ControllerBase
     [Authorize(Policy = Policies.OrdersWork)]
     public async Task<ActionResult<ApiResponse<RepairSuggestionResponse>>> Suggestions([FromServices] SuggestionService suggestions, Guid id, [FromQuery] bool ai = false, CancellationToken ct = default)
     {
-        if (ai && SubscriptionGateFilter.Current(HttpContext) is { } access) SubscriptionGateFilter.EnsureModule(access, PlanModules.Ai);
+        if (ai && SubscriptionGateFilter.Current(HttpContext) is { } access)
+        {
+            SubscriptionGateFilter.EnsureModule(access, PlanModules.Ai);
+            // Security audit 2026-11-23 (M-02): a GET passes the read-only gate, but every AI call costs money: an ended
+            // trial (still plan Pro) or a lapsed subscription does not get it.
+            if (!access.HasFullAccess)
+                throw new Application.Common.PaymentRequiredException(Application.Common.PaymentRequiredException.SubscriptionInactive,
+                    "Tu cuenta está en modo consulta. Elegí un plan para volver a usar las sugerencias con IA.");
+        }
         return Ok(Envelope.Ok(await suggestions.GetAsync(CurrentUser.GetShopId(User), id, ai, ct)));
     }
 

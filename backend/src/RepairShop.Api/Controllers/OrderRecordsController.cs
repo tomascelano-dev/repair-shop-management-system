@@ -112,8 +112,9 @@ public sealed class OrderRecordsController : ControllerBase
     [HttpPost("messages")]
     [Authorize(Policy = Policies.OrdersWork)]
     public async Task<ActionResult<ApiResponse<NotificationResult>>> Send(
-        [FromServices] NotificationService notifications, [FromServices] RepairOrderService orders, Guid orderId, [FromBody] SendOrderMessageRequest body, CancellationToken ct)
+        [FromServices] NotificationService notifications, [FromServices] RepairOrderService orders, Guid orderId, [FromBody] SendOrderMessageRequest body, [FromServices] RepairShop.Application.Abstractions.IUserRepository trustUsers, [FromServices] RepairShop.Application.Abstractions.IIntegrationStatus trustStatus, CancellationToken ct)
     {
+        await RepairShop.Application.Security.AccountTrust.RequireConfirmedEmailAsync(trustUsers, trustStatus, CurrentUser.GetUserId(User), ct); // security audit 2026-11-23 (A-06)
         var shopId = CurrentUser.GetShopId(User);
         var order = await orders.RequireAsync(shopId, orderId, ct);
         var correlation = $"order:{orderId}:manual:{body.TemplateKey}:{Guid.NewGuid():N}";

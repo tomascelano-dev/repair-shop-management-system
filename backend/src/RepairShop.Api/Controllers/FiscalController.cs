@@ -44,13 +44,14 @@ public sealed class FiscalController : ControllerBase
 
     [HttpGet("exchange-rates")]
     public async Task<ActionResult<ApiResponse<List<ExchangeRateResponse>>>> Rates([FromServices] ExchangeRateService rates, [FromQuery] int take = 30, CancellationToken ct = default)
-        => Ok(Envelope.Ok(await rates.ListRecentAsync(Math.Clamp(take, 1, 365), ct)));
+        => Ok(Envelope.Ok(await rates.ListRecentAsync(CurrentUser.GetOrganizationId(User), Math.Clamp(take, 1, 365), ct)));
 
-    /// <summary>Sets the rate of a day manually (e.g. the rate the shop actually used).</summary>
+    /// <summary>Sets the rate of a day manually (e.g. the rate the shop actually used). It belongs to the caller's
+    /// organization: it never changes the global rates the other shops use.</summary>
     [HttpPut("exchange-rates")]
     [Authorize(Policy = Policies.AdminOnly)]
     public async Task<ActionResult<ApiResponse<ExchangeRateResponse>>> SetRate([FromServices] ExchangeRateService rates, [FromBody] SetExchangeRateRequest body, CancellationToken ct)
-        => Ok(Envelope.Ok(await rates.SetAsync(body, ct)));
+        => Ok(Envelope.Ok(await rates.SetForOrganizationAsync(CurrentUser.GetOrganizationId(User), body, ct)));
 
     /// <summary>Fetches today's rates from the configured provider (dolarapi.com by default).</summary>
     [HttpPost("exchange-rates/refresh")]

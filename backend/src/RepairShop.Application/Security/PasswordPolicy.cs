@@ -4,7 +4,7 @@ namespace RepairShop.Application.Security;
 
 public static class PasswordPolicy
 {
-    public const int MinLength = 8;
+    public const int MinLength = 10; // the hasher refuses shorter ones (security audit 2026-11-23, B-04: 8-9 gave a 500)
 
     public static void Validate(string? password)
     {

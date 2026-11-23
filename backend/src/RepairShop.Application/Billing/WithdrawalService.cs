@@ -77,12 +77,14 @@ public sealed class WithdrawalService
         if (user is not null)
         {
             var confirmation =
-                $"Hola {request.Name},\n\n" +
+                // Security audit 2026-11-23 (M-08): the form is anonymous, so nothing typed in it (the name) goes into a mail the
+                // platform sends to the account holder: it could carry a phishing text from a legitimate sender.
+                $"Hola {user.DisplayName},\n\n" +
                 $"Recibimos tu solicitud de arrepentimiento (revocación de la contratación de RepairShop).\n\n" +
                 $"Código de identificación: {request.Code}\nFecha: {when}\n\n" +
                 "La procesamos sin costo: cancelamos la suscripción y, si hubo un pago, te lo reintegramos por el mismo medio " +
                 "(Mercado Pago). Te escribimos a este email cuando esté hecho.\n\n" +
-                "Si no hiciste esta solicitud, respondé este mensaje.";
+                "Si no hiciste esta solicitud, respondé este mensaje: no cancelamos nada sin confirmarlo con vos desde este email.";
             await _mailer.SendAsync(email, $"Solicitud de arrepentimiento {request.Code}", confirmation, ct);
         }
 

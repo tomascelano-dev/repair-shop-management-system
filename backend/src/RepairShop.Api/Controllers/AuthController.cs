@@ -35,16 +35,17 @@ public sealed class AuthController : ControllerBase
     [EnableRateLimiting(RateLimits.Auth)]
     public async Task<ActionResult<ApiResponse<LoginResponse>>> Login([FromServices] LoginSecurityService loginSecurity, [FromBody] LoginRequest body, CancellationToken ct)
     {
-        loginSecurity.EnsureNotLocked(body.Email);
+        var ip = HttpContext.ClientIp();
+        loginSecurity.EnsureNotLocked(body.Email, ip);
         try
         {
-            var result = await _auth.LoginAsync(body, HttpContext.ClientIp(), HttpContext.UserAgent(), ct);
-            loginSecurity.RegisterSuccess(body.Email);
+            var result = await _auth.LoginAsync(body, ip, HttpContext.UserAgent(), ct);
+            loginSecurity.RegisterSuccess(body.Email, ip);
             return Ok(Issue(result));
         }
         catch (UnauthorizedException)
         {
-            loginSecurity.RegisterFailure(body.Email);
+            loginSecurity.RegisterFailure(body.Email, ip);
             throw;
         }
     }

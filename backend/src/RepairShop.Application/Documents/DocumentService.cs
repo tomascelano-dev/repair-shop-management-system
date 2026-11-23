@@ -119,12 +119,17 @@ public sealed class DocumentService
         return new GeneratedDocument(_pdf.Label(model), $"etiqueta-{order.OrderNumber:D6}.pdf");
     }
 
-    public async Task<GeneratedDocument> QuoteAsync(Guid shopId, Guid orderId, Guid? quoteId, CancellationToken ct)
+    public Task<GeneratedDocument> QuoteAsync(Guid shopId, Guid orderId, Guid? quoteId, CancellationToken ct)
+        => QuoteAsync(shopId, orderId, quoteId, onlySent: false, ct);
+
+    private async Task<GeneratedDocument> QuoteAsync(Guid shopId, Guid orderId, Guid? quoteId, bool onlySent, CancellationToken ct)
     {
         var (shop, order, tz) = await OrderContextAsync(shopId, orderId, ct);
         var quotes = await _quotes.ListByOrderAsync(shopId, orderId, ct);
+        // Security audit 2026-11-23 (B-03): the public link (the customer's) only gets a quote the shop actually sent;
+        // a draft being worked on stays inside the shop.
         var quote = quoteId is null
-            ? quotes.FirstOrDefault(q => q.Status is QuoteStatus.Sent or QuoteStatus.Approved) ?? quotes.FirstOrDefault()
+            ? quotes.FirstOrDefault(q => q.Status is QuoteStatus.Sent or QuoteStatus.Approved) ?? (onlySent ? null : quotes.FirstOrDefault())
             : quotes.FirstOrDefault(q => q.Id == quoteId);
         if (quote is null) throw new NotFoundException("La orden no tiene presupuesto.");
 
@@ -247,7 +252,7 @@ public sealed class DocumentService
 
     // ===== Public (customer portal) =====
 
-    public async Task<GeneratedDocument> PublicQuoteAsync(RepairOrder order, CancellationToken ct) => await QuoteAsync(order.ShopId, order.Id, null, ct);
+    public async Task<GeneratedDocument> PublicQuoteAsync(RepairOrder order, CancellationToken ct) => await QuoteAsync(order.ShopId, order.Id, null, onlySent: true, ct);
 
     public async Task<GeneratedDocument> PublicWarrantyAsync(RepairOrder order, CancellationToken ct) => await WarrantyCertificateAsync(order.ShopId, order.Id, ct);
 

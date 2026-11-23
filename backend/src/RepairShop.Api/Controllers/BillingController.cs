@@ -87,9 +87,11 @@ public sealed class BillingController : ControllerBase
     [HttpPost("checkout")]
     [Authorize(Policy = Policies.AdminOnly)]
     [EnableRateLimiting(RateLimits.Auth)]
-    public async Task<ActionResult<ApiResponse<CheckoutResponse>>> Checkout([FromBody] CheckoutRequest body, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<CheckoutResponse>>> Checkout([FromBody] CheckoutRequest body,
+        [FromServices] IUserRepository users, [FromServices] IUserShopAccessRepository access, CancellationToken ct)
     {
         var org = CurrentUser.GetOrganizationId(User);
+        await Application.Admin.BranchAuthority.RequireOrganizationAdminAsync(users, access, CurrentUser.GetUserId(User), org, ct);
         var result = await _subscriptions.CheckoutAsync(org, CurrentUser.GetUserId(User), body, CurrentUser.GetActor(User), ct);
         SubscriptionGateFilter.Evict(_cache, org);
         return Ok(Envelope.Ok(result));
@@ -97,9 +99,11 @@ public sealed class BillingController : ControllerBase
 
     [HttpPost("cancel")]
     [Authorize(Policy = Policies.AdminOnly)]
-    public async Task<ActionResult<ApiResponse<SubscriptionResponse>>> Cancel(CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<SubscriptionResponse>>> Cancel(
+        [FromServices] IUserRepository users, [FromServices] IUserShopAccessRepository access, CancellationToken ct)
     {
         var org = CurrentUser.GetOrganizationId(User);
+        await Application.Admin.BranchAuthority.RequireOrganizationAdminAsync(users, access, CurrentUser.GetUserId(User), org, ct);
         var result = await _subscriptions.CancelAsync(org, CurrentUser.GetUserId(User), CurrentUser.GetActor(User), ct);
         SubscriptionGateFilter.Evict(_cache, org);
         return Ok(Envelope.Ok(result));

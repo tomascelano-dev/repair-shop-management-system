@@ -132,6 +132,15 @@ internal sealed class SubscriptionRepository : ISubscriptionRepository
         => _db.Subscriptions.FirstOrDefaultAsync(x => x.Provider == provider && x.ProviderSubscriptionId == providerSubscriptionId, ct);
 
     public async Task AddAsync(Subscription subscription, CancellationToken ct) => await _db.Subscriptions.AddAsync(subscription, ct);
+
+    public Task<List<Subscription>> ListForReconciliationAsync(BillingProvider provider, DateTime fromUtc, DateTime toUtc, int take, CancellationToken ct)
+        => _db.Subscriptions
+            .Where(x => x.Provider == provider && x.ProviderSubscriptionId != null &&
+                        (x.Status == SubscriptionStatus.Active || x.Status == SubscriptionStatus.PastDue || x.Status == SubscriptionStatus.Canceled) &&
+                        (x.CurrentPeriodEndsAtUtc == null || (x.CurrentPeriodEndsAtUtc >= fromUtc && x.CurrentPeriodEndsAtUtc <= toUtc)))
+            .OrderBy(x => x.CurrentPeriodEndsAtUtc)
+            .Take(take)
+            .ToListAsync(ct);
 }
 
 internal sealed class ShopProvisioner : IShopProvisioner

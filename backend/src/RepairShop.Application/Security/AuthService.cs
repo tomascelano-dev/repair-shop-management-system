@@ -131,8 +131,11 @@ public sealed class AuthService
             current = await _refreshTokens.GetByHashAsync(TokenHasher.Hash(rawToken), ct);
             if (current is not null && current.UserId != userId) current = null;
         }
+        // Security audit 2026-11-23 (B-05): switching branch issues a new 30-day refresh token, so it needs the session's own
+        // live refresh cookie: a stolen 15-minute access token alone must not turn into a long-lived session.
+        if (current is null || !current.IsActive(_clock.UtcNow)) throw new UnauthorizedException("Tu sesión venció. Volvé a ingresar.");
 
-        return await IssueAsync(user, target, shops, current?.FamilyId ?? Guid.Empty, ip, userAgent, ct, rotate: current);
+        return await IssueAsync(user, target, shops, current.FamilyId, ip, userAgent, ct, rotate: current);
     }
 
     public async Task<MeResponse> MeAsync(Guid userId, Guid shopId, CancellationToken ct)

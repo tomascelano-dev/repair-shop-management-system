@@ -49,13 +49,19 @@ public sealed class SettingsController : ControllerBase
 
     [HttpPut("integrations/mercadopago")]
     [Authorize(Policy = Policies.AdminOnly)]
-    public async Task<ActionResult<ApiResponse<IntegrationsStatusResponse>>> MercadoPago([FromBody] UpdateMercadoPagoRequest body, CancellationToken ct)
-        => Ok(Envelope.Ok(await _settings.UpdateMercadoPagoAsync(CurrentUser.GetShopId(User), body, CurrentUser.GetActor(User), ct)));
+    public async Task<ActionResult<ApiResponse<IntegrationsStatusResponse>>> MercadoPago([FromBody] UpdateMercadoPagoRequest body, [FromServices] RepairShop.Application.Abstractions.IUserRepository trustUsers, [FromServices] RepairShop.Application.Abstractions.IIntegrationStatus trustStatus, CancellationToken ct)
+    {
+        await RepairShop.Application.Security.AccountTrust.RequireConfirmedEmailAsync(trustUsers, trustStatus, CurrentUser.GetUserId(User), ct); // security audit 2026-11-23 (M-04)
+        return Ok(Envelope.Ok(await _settings.UpdateMercadoPagoAsync(CurrentUser.GetShopId(User), body, CurrentUser.GetActor(User), ct)));
+    }
 
     [HttpPut("integrations/fiscal")]
     [Authorize(Policy = Policies.AdminOnly)]
-    public async Task<ActionResult<ApiResponse<IntegrationsStatusResponse>>> Fiscal([FromBody] UpdateFiscalRequest body, CancellationToken ct)
-        => Ok(Envelope.Ok(await _settings.UpdateFiscalAsync(CurrentUser.GetShopId(User), body, CurrentUser.GetActor(User), ct)));
+    public async Task<ActionResult<ApiResponse<IntegrationsStatusResponse>>> Fiscal([FromBody] UpdateFiscalRequest body, [FromServices] RepairShop.Application.Abstractions.IUserRepository trustUsers, [FromServices] RepairShop.Application.Abstractions.IIntegrationStatus trustStatus, CancellationToken ct)
+    {
+        await RepairShop.Application.Security.AccountTrust.RequireConfirmedEmailAsync(trustUsers, trustStatus, CurrentUser.GetUserId(User), ct); // security audit 2026-11-23 (M-04)
+        return Ok(Envelope.Ok(await _settings.UpdateFiscalAsync(CurrentUser.GetShopId(User), body, CurrentUser.GetActor(User), ct)));
+    }
 
     [HttpGet("branches")]
     public async Task<ActionResult<ApiResponse<List<BranchResponse>>>> Branches(CancellationToken ct)

@@ -33,7 +33,7 @@ public sealed class ReportService
     {
         var (shop, f, t) = await RangeAsync(shopId, from, to, ct);
         var tz = RenderOrderMessageService.ResolveTimeZone(shop.TimeZone);
-        var converter = _rates.CreateConverter(shop.ReportingCurrency);
+        var converter = _rates.CreateConverter(shop.ReportingCurrency, shop.OrganizationId);
         var moves = await _q.MoneyMovementsAsync(shopId, f, t, ct);
 
         string PeriodKey(DateTime utc)
@@ -73,7 +73,7 @@ public sealed class ReportService
     {
         var (_, f, t) = await RangeAsync(shopId, from, to, ct);
         var shop = (await _shops.GetByIdAsync(shopId, ct))!;
-        var converter = _rates.CreateConverter(shop.ReportingCurrency);
+        var converter = _rates.CreateConverter(shop.ReportingCurrency, shop.OrganizationId);
 
         var orders = (await _q.OrderFactsAsync(shopId, f, t, byDelivery: true, ct)).Where(o => o.Status == RepairOrderStatus.Delivered).ToList();
         var parts = await _q.PartUsesAsync(shopId, orders.Select(o => o.Id).ToList(), ct);
@@ -143,7 +143,7 @@ public sealed class ReportService
         var toDelivery = orders.Where(o => o.DeliveredAtUtc is not null).Select(o => (o.DeliveredAtUtc!.Value - o.CreatedAtUtc).TotalHours).ToList();
         var bottleneck = byStatus.Where(r => r.Status is not nameof(RepairOrderStatus.Ready)).OrderByDescending(r => r.AverageHours).FirstOrDefault()?.Label;
 
-        return new RepairTimesReport(Period(f, t, _rates.CreateConverter(shop.ReportingCurrency)), orders.Count,
+        return new RepairTimesReport(Period(f, t, _rates.CreateConverter(shop.ReportingCurrency, shop.OrganizationId)), orders.Count,
             toReady.Count == 0 ? null : Math.Round(toReady.Average(), 1), toDelivery.Count == 0 ? null : Math.Round(toDelivery.Average(), 1), byStatus, bottleneck);
     }
 
@@ -153,7 +153,7 @@ public sealed class ReportService
         var quotes = (await _q.QuoteFactsAsync(shopId, f, t, ct)).Where(q => q.Status != QuoteStatus.Superseded).ToList();
         int C(QuoteStatus s) => quotes.Count(q => q.Status == s);
         var decided = C(QuoteStatus.Approved) + C(QuoteStatus.Rejected) + C(QuoteStatus.Expired);
-        return new QuoteStatsReport(Period(f, t, _rates.CreateConverter(shop.ReportingCurrency)), quotes.Count, C(QuoteStatus.Approved), C(QuoteStatus.Rejected),
+        return new QuoteStatsReport(Period(f, t, _rates.CreateConverter(shop.ReportingCurrency, shop.OrganizationId)), quotes.Count, C(QuoteStatus.Approved), C(QuoteStatus.Rejected),
             C(QuoteStatus.Expired), C(QuoteStatus.Draft) + C(QuoteStatus.Sent),
             decided == 0 ? null : Math.Round(100.0 * C(QuoteStatus.Approved) / decided, 1),
             quotes.Where(q => q.Status == QuoteStatus.Approved).GroupBy(q => q.Currency)
@@ -175,7 +175,7 @@ public sealed class ReportService
             })
             .OrderByDescending(r => r.Orders).Take(15).ToList();
 
-        return new TopIssuesReport(Period(f, t, _rates.CreateConverter(shop.ReportingCurrency)),
+        return new TopIssuesReport(Period(f, t, _rates.CreateConverter(shop.ReportingCurrency, shop.OrganizationId)),
             Top(o => string.IsNullOrWhiteSpace(o.Category) ? "Sin categoría" : o.Category!),
             Top(o => $"{o.Brand} {o.Model}"),
             Top(o => o.Brand));
@@ -203,7 +203,7 @@ public sealed class ReportService
             })
             .OrderByDescending(r => r.Delivered).ToList();
 
-        return new TechniciansReport(Period(f, t, _rates.CreateConverter(shop.ReportingCurrency)), rows);
+        return new TechniciansReport(Period(f, t, _rates.CreateConverter(shop.ReportingCurrency, shop.OrganizationId)), rows);
     }
 
     public async Task<WarrantyReport> WarrantyAsync(Guid shopId, DateTime? from, DateTime? to, CancellationToken ct)
@@ -225,7 +225,7 @@ public sealed class ReportService
             })
             .OrderByDescending(r => r.Claims).ThenByDescending(r => r.Uses).ToList();
 
-        return new WarrantyReport(Period(f, t, _rates.CreateConverter(shop.ReportingCurrency)), delivered.Count, claimsOf.Count,
+        return new WarrantyReport(Period(f, t, _rates.CreateConverter(shop.ReportingCurrency, shop.OrganizationId)), delivered.Count, claimsOf.Count,
             delivered.Count == 0 ? null : Math.Round(100.0 * claimsOf.Count / delivered.Count, 1), byPart);
     }
 
@@ -233,7 +233,7 @@ public sealed class ReportService
     {
         var (shop, f, t) = await RangeAsync(shopId, from, to, ct);
         var rows = await _q.FeedbackAsync(shopId, f, t, ct);
-        return new FeedbackReport(Period(f, t, _rates.CreateConverter(shop.ReportingCurrency)), rows.Count,
+        return new FeedbackReport(Period(f, t, _rates.CreateConverter(shop.ReportingCurrency, shop.OrganizationId)), rows.Count,
             rows.Count == 0 ? null : Math.Round(rows.Average(r => r.Score), 2),
             Enumerable.Range(1, 5).ToDictionary(s => s, s => rows.Count(r => r.Score == s)),
             rows.OrderByDescending(r => r.CreatedAtUtc).Take(30).Select(r => new FeedbackComment(RepairOrder.FormatCode(r.OrderNumber), r.Score, r.Comment, r.CreatedAtUtc)).ToList());

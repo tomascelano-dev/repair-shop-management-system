@@ -23,8 +23,10 @@ public static class MercadoPagoSignature
         }
         if (ts is null || v1 is null) return false;
 
-        if (tolerance is not null && long.TryParse(ts, out var tsValue))
+        if (tolerance is not null)
         {
+            // Security audit 2026-11-23 (B-07): a ts that is not a number used to skip the age check altogether.
+            if (!long.TryParse(ts, out var tsValue) || tsValue <= 0 || tsValue > 253_402_300_799_999) return false;
             // ts may come in seconds or milliseconds.
             var when = tsValue > 10_000_000_000 ? DateTimeOffset.FromUnixTimeMilliseconds(tsValue) : DateTimeOffset.FromUnixTimeSeconds(tsValue);
             if ((nowUtc - when.UtcDateTime).Duration() > tolerance) return false;

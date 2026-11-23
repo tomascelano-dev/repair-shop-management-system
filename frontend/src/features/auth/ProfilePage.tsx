@@ -46,8 +46,8 @@ export function ProfilePage() {
       setErrors({ confirm: 'Las contraseñas no coinciden.' })
       return
     }
-    if (next.length < 8 || !/[a-zA-Z]/.test(next) || !/\d/.test(next)) {
-      setErrors({ newPassword: 'Usá al menos 8 caracteres, con letras y números.' })
+    if (next.length < 10 || !/[a-zA-Z]/.test(next) || !/\d/.test(next)) {
+      setErrors({ newPassword: 'Usá al menos 10 caracteres, con letras y números.' })
       return
     }
     change.mutate()
@@ -76,7 +76,7 @@ export function ProfilePage() {
             <Field label="Contraseña actual" error={errors.currentPassword}>
               <Input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
             </Field>
-            <Field label="Nueva contraseña" error={errors.newPassword} hint="Mínimo 8 caracteres, con letras y números. Una frase fácil de recordar es más segura que una palabra rara.">
+            <Field label="Nueva contraseña" error={errors.newPassword} hint="Mínimo 10 caracteres, con letras y números. Una frase fácil de recordar es más segura que una palabra rara.">
               <Input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
             </Field>
             <Field label="Repetí la nueva contraseña" error={errors.confirm}>

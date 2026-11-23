@@ -188,6 +188,15 @@ public sealed class NotificationOutboxItem : IShopScoped
         UpdatedAtUtc = nowUtc;
     }
 
+    /// <summary>Drops the body once it no longer has to be sent (it held a one-time account link), so neither the table
+    /// nor its backups keep a usable token. Only for messages that are done: sent or given up.</summary>
+    public void RedactBody(DateTime nowUtc)
+    {
+        if (Status is not (OutboxStatus.Sent or OutboxStatus.Cancelled)) return;
+        Body = "[link de un solo uso omitido después del envío]";
+        UpdatedAtUtc = nowUtc;
+    }
+
     private static string Truncate(string? value, int max)
     {
         value = (value ?? "").Trim();

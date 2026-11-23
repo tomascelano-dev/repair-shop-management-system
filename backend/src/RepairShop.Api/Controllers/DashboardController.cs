@@ -43,6 +43,6 @@ public sealed class DashboardController : ControllerBase
             .Select(b => (b.Id, b.Name))
             .ToList();
 
-        return Ok(Envelope.Ok(await _dashboard.GetConsolidatedAsync(branches, current.ReportingCurrency, ct)));
+        return Ok(Envelope.Ok(await _dashboard.GetConsolidatedAsync(branches, current.ReportingCurrency, current.OrganizationId, ct)));
     }
 }

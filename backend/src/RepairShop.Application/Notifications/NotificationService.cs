@@ -17,6 +17,8 @@ namespace RepairShop.Application.Notifications;
 public sealed class NotificationService
 {
     public const string EntityTypeRepairOrder = "repair_order";
+    /// <summary>Messages a shop's staff can queue in 24 hours (automatic ones do not count).</summary>
+    public const int StaffMessagesPerDay = 300;
 
     private readonly RenderOrderMessageService _renderer;
     private readonly IShopRepository _shops;
@@ -84,6 +86,11 @@ public sealed class NotificationService
 
         if (await _outbox.ExistsAsync(shopId, correlationKey, ct))
             return new NotificationResult(preview.TemplateKey, preview.Title, body, waUrl, null, "duplicate");
+
+        // Security audit 2026-11-23 (A-06): messages leave through the platform's own sender (SMTP, Twilio, Meta), so
+        // what a shop's staff can queue by hand is capped per day; a burst from one shop cannot flood the shared queue.
+        if (!actor.IsSystem && await _outbox.CountQueuedByStaffSinceAsync(shopId, _clock.UtcNow.AddDays(-1), ct) >= StaffMessagesPerDay)
+            return new NotificationResult(preview.TemplateKey, preview.Title, body, waUrl, null, "daily_limit");
 
         var item = new NotificationOutboxItem(shopId, ch, recipient, preview.Title, body, OutboxStatus.Pending,
             correlationKey, EntityTypeRepairOrder, order.Id, _clock.UtcNow);

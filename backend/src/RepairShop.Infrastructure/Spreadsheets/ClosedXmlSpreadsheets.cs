@@ -76,8 +76,40 @@ public sealed class SpreadsheetReader : ISpreadsheetReader
         };
     }
 
+    /// <summary>Security audit 2026-11-23 (M-07): ClosedXML loads the whole workbook in memory before the 5000-row cap, so a
+    /// small, highly compressed xlsx could take down the container every shop shares. The zip is checked first.</summary>
+    public const long MaxUncompressedBytes = 64L * 1024 * 1024;
+    public const int MaxZipEntries = 500;
+
+    internal static void EnsureReasonableWorkbook(Stream content)
+    {
+        var start = content.CanSeek ? content.Position : throw new DomainException("No se pudo leer el archivo.");
+        try
+        {
+            using var zip = new System.IO.Compression.ZipArchive(content, System.IO.Compression.ZipArchiveMode.Read, leaveOpen: true);
+            if (zip.Entries.Count > MaxZipEntries) throw new DomainException("El archivo de Excel tiene demasiadas partes. Guardalo de nuevo o usá .csv.");
+            long total = 0;
+            foreach (var entry in zip.Entries)
+            {
+                total += entry.Length;
+                if (entry.Length < 0 || total > MaxUncompressedBytes)
+                    throw new DomainException("El archivo de Excel es demasiado grande una vez descomprimido. Partilo en varios o usá .csv.");
+            }
+        }
+        catch (InvalidDataException) { throw new DomainException("El archivo no es un Excel válido (.xlsx)."); }
+        finally { content.Position = start; }
+    }
+
     private static IReadOnlyList<IReadOnlyDictionary<string, string>> ReadExcel(Stream content)
     {
+        if (!content.CanSeek)
+        {
+            var copy = new MemoryStream();
+            content.CopyTo(copy);
+            copy.Position = 0;
+            content = copy;
+        }
+        EnsureReasonableWorkbook(content);
         using var wb = new XLWorkbook(content);
         var ws = wb.Worksheets.First();
         var used = ws.RangeUsed();
