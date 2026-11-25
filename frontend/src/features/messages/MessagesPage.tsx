@@ -40,7 +40,7 @@ export function MessagesPage() {
 
   return (
     <div>
-      <PageHeader title="Mensajes" subtitle="Avisos automáticos a clientes (WhatsApp, email, SMS): enviados, pendientes y con error." />
+      <PageHeader title="Mensajes" subtitle="Avisos a clientes por email y WhatsApp: enviados, pendientes y con error." />
       {channels && Object.values(channels).every((v) => !v) ? (
         <Alert tone="amber" className="mb-4" title="No hay canales de envío configurados">
           Los avisos se registran pero no salen solos. Mientras tanto podés enviarlos por WhatsApp desde cada orden con un clic.

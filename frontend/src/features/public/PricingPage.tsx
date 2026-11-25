@@ -25,7 +25,7 @@ export function PricingPage({ initialCountry }: { initialCountry?: string } = {}
   const country = picked && offered.includes(picked) ? picked : detectCountry(offered)
   const plans = useQuery({ queryKey: ['plans', country], queryFn: () => billingApi.plans(country) })
   const currency = plans.data?.currency ?? config.data?.countries.find((c) => c.code === country)?.currency ?? 'ARS'
-  const features = en ? ['Orders, estimates and workshop board', 'Customer tracking and estimate approval', 'Point of sale, cash register and inventory', 'WhatsApp, email and SMS notifications', 'Unlimited users'] : ['Órdenes, presupuestos y tablero del taller', 'Seguimiento y aprobación de presupuestos para clientes', 'Punto de venta, caja e inventario', 'Avisos por WhatsApp, email y SMS', 'Usuarios ilimitados']
+  const features = en ? ['Orders, estimates and workshop board', 'Customer tracking and estimate approval', 'Point of sale, cash register and inventory', 'Email and WhatsApp notifications', 'Mercado Pago payment links and ARCA e-invoicing', 'Unlimited users'] : ['Órdenes, presupuestos y tablero del taller', 'Seguimiento y aprobación de presupuestos para clientes', 'Punto de venta, caja e inventario', 'Avisos por email y WhatsApp', 'Cobro con Mercado Pago y factura electrónica ARCA', 'Usuarios ilimitados']
   return (
     <PublicLayout title={en ? 'Pricing' : 'Precios'} documentTitle={SEO_TITLES.pricing[locale]}>
       <main className="mx-auto max-w-6xl px-4 pb-10">

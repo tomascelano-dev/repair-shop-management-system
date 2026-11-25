@@ -66,7 +66,8 @@ export const CORE_FEATURES = [
   'Órdenes, presupuestos y tablero del taller',
   'Portal del cliente con seguimiento y aprobación',
   'Punto de venta, caja e inventario',
-  'Avisos por WhatsApp, email y SMS',
+  'Avisos por email y WhatsApp',
+  'Cobro con Mercado Pago y factura electrónica ARCA',
   'Usuarios ilimitados',
 ]
 

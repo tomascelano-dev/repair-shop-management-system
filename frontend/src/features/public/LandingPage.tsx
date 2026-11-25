@@ -9,20 +9,26 @@ import { PublicLayout } from './PublicLayout'
 /** What the product does, in the words shops search with ("órdenes de reparación", "stock de repuestos"...). */
 const details: Record<'es' | 'en', [string, string][]> = {
   es: [
-    ['Órdenes de reparación', 'Ingreso del equipo con checklist, fotos y firma del cliente; diagnóstico, presupuesto, reparación y control de calidad antes de entregar.'],
-    ['Seguimiento online para el cliente', 'Cada orden tiene un enlace donde el cliente ve el estado, aprueba el presupuesto y califica la atención, sin llamar al taller.'],
-    ['Avisos por WhatsApp y email', 'Plantillas de mensajes para avisarle al cliente que su equipo está listo o que tiene un presupuesto para aprobar.'],
-    ['Stock de repuestos y compras', 'Reserva repuestos para cada orden, controla el stock por sucursal y registra las compras a tus proveedores.'],
-    ['Punto de venta y caja', 'Vende accesorios con lector de código de barras, cobra en efectivo o con Mercado Pago y cierra la caja del día con su arqueo.'],
-    ['Factura electrónica ARCA y garantías', 'Emite facturas con tu propio certificado y punto de venta (Argentina) e imprime el certificado de garantía de cada reparación.'],
+    ['Órdenes de reparación', 'Ingreso del equipo con checklist y firma del cliente en pantalla, fotos del estado en la orden, diagnóstico, presupuesto, reparación y control de calidad antes de entregar.'],
+    ['Seguimiento online para el cliente', 'Cada orden tiene un enlace y un código QR, sin app ni contraseña: el cliente ve el estado, aprueba el presupuesto, paga y califica la atención sin llamar al taller.'],
+    ['Avisos por email y WhatsApp', 'El email sale solo cuando cambia el estado, hay un presupuesto para aprobar o el equipo espera ser retirado. Para WhatsApp, el mensaje queda escrito con tus plantillas y lo envías con un clic desde tu número.'],
+    ['Stock de repuestos y compras', 'El repuesto queda reservado cuando el cliente aprueba el presupuesto. Controla el stock por sucursal y la compatibilidad por marca y modelo, y registra las compras a tus proveedores (planes Estándar y Profesional).'],
+    ['Punto de venta y caja', 'Vende accesorios con lector de código de barras, cobra con varios medios de pago en la misma venta y cierra la caja del día con su arqueo.'],
+    ['Cobro con Mercado Pago', 'Conecta tu cuenta y genera un link de pago por orden: el cliente paga desde su enlace de seguimiento y el pago se acredita solo en la orden.'],
+    ['Factura electrónica ARCA y garantías', 'Emite facturas con tu propio certificado y punto de venta (Argentina), imprime el certificado de garantía y registra cada reclamo vinculado a la reparación original.'],
+    ['Precios en pesos o en dólares', 'Carga costos y precios de repuestos en dólares: RepairShop los convierte con la cotización del día.'],
+    ['Reglas que evitan errores', 'No se pasa a reparar sin presupuesto aprobado ni se entrega con saldo pendiente sin la autorización de un administrador. El código de desbloqueo del equipo se guarda cifrado y se borra al entregar.'],
   ],
   en: [
-    ['Repair orders', 'Device intake with checklist, photos and customer signature; diagnosis, estimate, repair and quality check before delivery.'],
-    ['Online tracking for customers', 'Every order has a link where the customer sees the status, approves the estimate and rates the service.'],
-    ['WhatsApp and email notifications', 'Message templates to tell customers their device is ready or an estimate is waiting for their approval.'],
-    ['Parts inventory and purchasing', 'Reserve parts for each order, track stock per branch and record purchases from your suppliers.'],
-    ['Point of sale and cash register', 'Sell accessories with a barcode scanner, take cash or Mercado Pago payments and close the register every day.'],
-    ['Electronic invoicing and warranties', 'Issue ARCA invoices with your own certificate (Argentina) and print the warranty certificate of each repair.'],
+    ['Repair orders', 'Device intake with checklist and on-screen customer signature, photos of its condition on the order, diagnosis, estimate, repair and quality check before delivery.'],
+    ['Online tracking for customers', 'Every order has a link and a QR code, no app or password: the customer sees the status, approves the estimate, pays and rates the service.'],
+    ['Email and WhatsApp notifications', 'Emails go out on their own when the status changes, an estimate is waiting or the device is ready for pickup. For WhatsApp, the message is written from your templates and you send it with one click from your own number.'],
+    ['Parts inventory and purchasing', 'Parts are reserved when the customer approves the estimate. Track stock per branch and compatibility by brand and model, and record purchases from your suppliers (Standard and Professional plans).'],
+    ['Point of sale and cash register', 'Sell accessories with a barcode scanner, take several payment methods in one sale and close the register every day.'],
+    ['Mercado Pago payments', 'Connect your account and create a payment link per order: the customer pays from the tracking link and the payment is recorded on the order by itself.'],
+    ['Electronic invoicing and warranties', 'Issue ARCA invoices with your own certificate (Argentina), print the warranty certificate and record every claim linked to the original repair.'],
+    ['Prices in local currency or dollars', 'Enter part costs and prices in dollars: RepairShop converts them with the rate of the day.'],
+    ['Rules that prevent mistakes', 'No repair starts without an approved estimate and no device leaves with a balance due unless an administrator allows it. The device unlock code is stored encrypted and erased on delivery.'],
   ],
 }
 
