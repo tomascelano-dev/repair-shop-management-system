@@ -120,17 +120,22 @@ public sealed class DocumentService
     }
 
     public Task<GeneratedDocument> QuoteAsync(Guid shopId, Guid orderId, Guid? quoteId, CancellationToken ct)
-        => QuoteAsync(shopId, orderId, quoteId, onlySent: false, ct);
+        => QuoteAsync(shopId, orderId, quoteId, publicLink: false, ct);
 
-    private async Task<GeneratedDocument> QuoteAsync(Guid shopId, Guid orderId, Guid? quoteId, bool onlySent, CancellationToken ct)
+    private async Task<GeneratedDocument> QuoteAsync(Guid shopId, Guid orderId, Guid? quoteId, bool publicLink, CancellationToken ct)
     {
         var (shop, order, tz) = await OrderContextAsync(shopId, orderId, ct);
         var quotes = await _quotes.ListByOrderAsync(shopId, orderId, ct);
         // Security audit 2026-11-23 (B-03): the public link (the customer's) only gets a quote the shop actually sent;
-        // a draft being worked on stays inside the shop.
-        var quote = quoteId is null
-            ? quotes.FirstOrDefault(q => q.Status is QuoteStatus.Sent or QuoteStatus.Approved) ?? (onlySent ? null : quotes.FirstOrDefault())
-            : quotes.FirstOrDefault(q => q.Id == quoteId);
+        // a draft being worked on stays inside the shop. It is the same quote the tracking page shows
+        // (PublicPortalService.GetAsync), so its "download" button never points at nothing.
+        var quote = quoteId is not null
+            ? quotes.FirstOrDefault(q => q.Id == quoteId)
+            : publicLink
+                ? quotes.FirstOrDefault(q => q.Status == QuoteStatus.Sent)
+                    ?? quotes.FirstOrDefault(q => q.Status == QuoteStatus.Approved)
+                    ?? quotes.FirstOrDefault(q => q.Status is QuoteStatus.Rejected or QuoteStatus.Expired)
+                : quotes.FirstOrDefault(q => q.Status is QuoteStatus.Sent or QuoteStatus.Approved) ?? quotes.FirstOrDefault();
         if (quote is null) throw new NotFoundException("La orden no tiene presupuesto.");
 
         var customer = await _customers.GetByIdAsync(shopId, order.CustomerId, ct);
@@ -252,7 +257,7 @@ public sealed class DocumentService
 
     // ===== Public (customer portal) =====
 
-    public async Task<GeneratedDocument> PublicQuoteAsync(RepairOrder order, CancellationToken ct) => await QuoteAsync(order.ShopId, order.Id, null, onlySent: true, ct);
+    public async Task<GeneratedDocument> PublicQuoteAsync(RepairOrder order, CancellationToken ct) => await QuoteAsync(order.ShopId, order.Id, null, publicLink: true, ct);
 
     public async Task<GeneratedDocument> PublicWarrantyAsync(RepairOrder order, CancellationToken ct) => await WarrantyCertificateAsync(order.ShopId, order.Id, ct);
 

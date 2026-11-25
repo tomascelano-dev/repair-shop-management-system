@@ -296,7 +296,9 @@ public sealed class SubscriptionService
                 if (state is null) continue;
                 if (await _uow.RetryOnConflictAsync(c => ApplyAsync(sub.BillingCountry, state, c), ct, maxAttempts: 6) is not null) applied++;
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            // HttpClient reports its own timeout as a TaskCanceledException while our token is still live: that is a
+            // failed call like any other. Only a cancellation we were asked for (shutdown) leaves the loop.
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 _logger.LogWarning(ex, "Could not reconcile Mercado Pago subscription {Id}.", id);
             }

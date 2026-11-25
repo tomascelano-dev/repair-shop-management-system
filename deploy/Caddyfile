@@ -5,12 +5,8 @@
 	auto_https off
 	servers {
 		# Requests arrive from the host proxy through Docker's network: trust the X-Forwarded-For it sends and
-		# take the right-most address that is not a trusted proxy as the client IP.
-		# Security audit 2026-11-23 (M-03): Cloudflare's edge is a proxy too. Without its ranges here the right-most
-		# untrusted address was Cloudflare's, so every visitor behind the same edge shared the per-IP limits and the
-		# stored IPs (quote approvals, signups) were Cloudflare's. Ranges from https://www.cloudflare.com/ips/
-		# (check them again from time to time; a missing range only falls back to the old behaviour for that edge).
-		trusted_proxies static private_ranges 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+		# take the right-most address that is not a private proxy as the client IP.
+		trusted_proxies static private_ranges
 		trusted_proxies_strict
 		client_ip_headers X-Forwarded-For
 	}

@@ -81,7 +81,10 @@ public sealed class ScheduledJobsService : BackgroundService
             var affected = await job(scope.ServiceProvider);
             if (affected > 0) _logger.LogInformation("Job {Job} processed {Count} item(s).", name, affected);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        // A job that escapes here faults the BackgroundService and, by default, stops the whole host. An HTTP timeout
+        // inside a job surfaces as an OperationCanceledException with our token still live, so it must be logged like
+        // any other failure; only the shutdown we were asked for goes through.
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             _logger.LogError(ex, "Job {Job} failed.", name);
         }
